@@ -80,7 +80,7 @@ export function SiteFooter() {
       </Container>
       <div className="border-t border-line-on-chassis">
         <Container className="py-5 text-xs text-on-chassis-muted">
-          © {new Date().getFullYear()} {SITE.name}. CAC registered (RC 9403389).
+          © {new Date().getFullYear()} {SITE.name}. Registered business name, CAC BN 9403389.
         </Container>
       </div>
     </footer>
