@@ -62,3 +62,21 @@ export function itemFromAppliance(
     onBackup,
   };
 }
+
+/** Typical hours per day, so the customer only changes what's different. Anything not listed defaults to 5. */
+export const DEFAULT_HOURS: Record<string, number> = {
+  "led-bulb": 6,
+  "wifi-router": 24,
+  "cctv-kit": 24,
+  refrigerator: 24,
+  "chest-freezer": 24,
+  "led-security-light": 12,
+  "standing-fan": 8,
+  "ceiling-fan": 8,
+  "ac-1hp": 6,
+  "ac-1-5hp": 6,
+  laptop: 6,
+  "desktop-computer": 6,
+  "phone-charger": 3,
+  "water-pump-half-hp": 1,
+};
