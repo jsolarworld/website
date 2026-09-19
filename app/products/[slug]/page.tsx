@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, permanentRedirect } from "next/navigation";
 import { Badge, Card, CardBody, Container, Eyebrow, Notice, Price, Section, SpecList, buttonClass } from "@/components/ui";
 import { effectivePrice, getProduct, stockStatus } from "@/lib/catalogue";
+import { db } from "@/lib/db";
 import { SITE, formatNaira, jsonLd, whatsappLink } from "@/lib/site";
 
 export const revalidate = 60;
@@ -39,8 +40,14 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 export default async function ProductPage({ params }: Props) {
-  const p = await getProduct((await params).slug);
-  if (!p) notFound();
+  const { slug } = await params;
+  const p = await getProduct(slug);
+  if (!p) {
+    // A renamed product keeps its old link working (PRD SEO-03).
+    const moved = await db.redirect.findUnique({ where: { fromPath: `/products/${slug}` } });
+    if (moved) permanentRedirect(moved.toPath);
+    notFound();
+  }
 
   const status = stockStatus(p);
   const price = effectivePrice(p);
