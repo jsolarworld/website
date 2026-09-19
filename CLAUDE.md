@@ -50,6 +50,7 @@ Package manager is **pnpm** (see `packageManager` in `package.json`).
 - `pnpm lint` — ESLint (flat config, `eslint.config.mjs`, `eslint-config-next`)
 - `pnpm test` — Vitest (`vitest run`); single file: `pnpm exec vitest run lib/quote/engine.test.ts`, single test: add `-t "name"`
 - Type check: `pnpm exec tsc --noEmit`
+- After ANY schema change: `prisma migrate dev`, then `pnpm exec prisma generate`, then **restart `pnpm dev`** (Turbopack keeps the old generated client in memory; symptom is Better Auth's "Prisma schema mismatch ... Missing columns" even though the DB is correct).
 - Prisma 7 (pinned `prisma@7.10.0` to match `@prisma/client`; don't let the CLI drift to the 8.x RC): `pnpm exec prisma validate | format | generate`, `pnpm db:migrate`, `pnpm db:studio`. Client is generated into `generated/prisma` (gitignored; `postinstall` regenerates it, needed for Vercel builds). CLI uses `DATABASE_URL` (direct) via `prisma.config.ts`; the app uses `DATABASE_URL_POOLED` through the single client in `lib/db.ts`, which needs the `@prisma/adapter-pg` driver adapter. Money columns are whole naira `Int`; convert to kobo only for Paystack. Secrets live in gitignored `.env` (DB, Paystack, Cloudinary)—never print or commit them.
 
 ## Design system
