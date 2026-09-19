@@ -8,7 +8,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 E-commerce site for **J Solar World Energy**, a solar equipment retailer/installer at Alaba International Market, Lagos, Nigeria (inverters, lithium/tubular batteries, panels, street lights, accessories, complete system packages). Planned scope: landing, About, Products (store with cart/checkout), Services, a "Get a Quote" tool that sizes a solar setup from an appliance list, an admin panel for products/orders, and an optional SEO blog.
 
-Current state: untouched `create-next-app` scaffold (single `app/page.tsx`, default metadata in `app/layout.tsx`). The only product code so far is the quote engine in `lib/quote/` (pure TypeScript, no framework or DB imports; `engine.ts` holds the PRD 7.2/7.3 formulas and matching, `appliances.ts` the 7.5 library, `defaults.ts` the admin-editable settings). Its tests use the PRD 7.4 worked example as the source of truth. The Prisma schema (`prisma/schema.prisma`) is migrated to the Neon database (`prisma/migrations/`) and seeded via `pnpm db:seed` (`prisma/seed.ts`: categories with spec templates, owner-listed brands, the 26-appliance library, `quote.settings`; idempotent, never overwrites edited settings). No products or packages are loaded yet.
+Current state: Prisma schema migrated and seeded; the design system is in place (see below); the storefront browse path is built and reads from the database: home, `/products` (GET-form filters, search, sort, pagination), `/categories/[slug]`, `/products/[slug]` (specs, package contents, Product/Breadcrumb JSON-LD), plus header, footer, floating WhatsApp button, 404, `robots.ts` and `sitemap.ts`. **Not built yet:** cart, checkout, Paystack/transfer flow, `/solar-quote` UI, `/services`, `/about`, `/blog`, legal pages, account, admin, Better Auth, and any real products. Header/footer link to several of those, so they 404 until built. Product pages use "Order on WhatsApp" until the cart exists. Live URL: https://j-solar-world.vercel.app (`NEXT_PUBLIC_SITE_URL` overrides `SITE.url`).
+
+Quote engine lives in `lib/quote/` (pure TypeScript, no framework or DB imports; `engine.ts` holds the PRD 7.2/7.3 formulas and matching, `appliances.ts` the 7.5 library, `defaults.ts` the admin-editable settings); its tests use the PRD 7.4 worked example as the source of truth. The Prisma schema (`prisma/schema.prisma`) is migrated to the Neon database (`prisma/migrations/`) and seeded via `pnpm db:seed` (`prisma/seed.ts`: categories with spec templates, owner-listed brands, the 26-appliance library, `quote.settings`; idempotent, never overwrites edited settings).
+
+Data access: `lib/catalogue.ts` holds the storefront queries (published-only; `effectivePrice`, `stockStatus`). Catalogue pages use `revalidate = 60`; pages reading `searchParams` are dynamic. Business constants (phones, WhatsApp, address, hours) and helpers (`whatsappLink`, `formatNaira`, `jsonLd`) are in `lib/site.ts`; use them instead of hard-coding contact details. `public/logo.webp` is the company logo (has dark-blue lettering, so it sits on a white tile over navy).
+
+## Design system
+
+Read `docs/DESIGN.md` before touching UI; browse components at `/design`. Tokens are in `app/globals.css`; components in `components/ui/` (import from `@/components/ui`). Use semantic tokens (`bg-surface`, `text-muted`, `border-line`, `bg-chassis`), never raw ramp stops. One gold (`primary`) action per view. New custom `@theme` keys must be registered in `lib/cn.ts`.
 
 ## Planned architecture (from the PRD, dated 2026-09-17)
 
@@ -34,6 +42,17 @@ Package manager is **pnpm** (see `packageManager` in `package.json`).
 - `pnpm test` — Vitest (`vitest run`); single file: `pnpm exec vitest run lib/quote/engine.test.ts`, single test: add `-t "name"`
 - Type check: `pnpm exec tsc --noEmit`
 - Prisma 7 (pinned `prisma@7.10.0` to match `@prisma/client`; don't let the CLI drift to the 8.x RC): `pnpm exec prisma validate | format | generate`, `pnpm db:migrate`, `pnpm db:studio`. Client is generated into `generated/prisma` (gitignored; `postinstall` regenerates it, needed for Vercel builds). CLI uses `DATABASE_URL` (direct) via `prisma.config.ts`; the app uses `DATABASE_URL_POOLED` through the single client in `lib/db.ts`, which needs the `@prisma/adapter-pg` driver adapter. Money columns are whole naira `Int`; convert to kobo only for Paystack. Secrets live in gitignored `.env` (DB, Paystack, Cloudinary)—never print or commit them.
+
+## Design system
+
+Full rationale: [docs/DESIGN.md](docs/DESIGN.md). Living style guide: `/design` (noindex). Tokens in `app/globals.css`, components in `components/ui/` (import from `@/components/ui`).
+
+Colours are sampled from the company logo: navy `#032f7f`/`#0153b7` is the chassis, solar gold `#fcd012` is the primary action (one per view), grid green `#55a022` is positive status, ember `#f49518` is sale/urgency. Type is Archivo (display) + Inter (text). Build on the **semantic** tokens (`bg-surface`, `text-muted`, `border-line`, `bg-chassis`), not raw ramp stops.
+
+Two things that bite:
+
+- **`lib/cn.ts` must list every custom `@theme` key** (`--text-*`, `--font-*`, `--shadow-*`, `--animate-*`). tailwind-merge silently files an unregistered `text-micro` as a colour, so it collides with `text-muted` and the font size vanishes from every eyebrow on the site — no error, no warning. Add new keys to `extend.theme` there.
+- **`sun-bloom` is for light surfaces; `sun-bloom-dark` for navy** (it needs to be an overlay element, since it relies on `mix-blend-mode`). Painting plain `sun-bloom` on the chassis turns the gold olive.
 
 ## Stack notes
 

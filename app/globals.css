@@ -1,26 +1,309 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+/* ============================================================================
+   J Solar World Energy - design tokens
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
+   Palette sampled from the company logo (chat/STK-20260919-WA0042.webp):
+     #032f7f  wordmark navy      -> navy-800
+     #0153b7  panel / "J" blue   -> navy-600
+     #fcd012  sun yellow         -> solar-400
+     #f5b301  deep gold          -> solar-500
+     #f49518  "solar" orange     -> ember-500
+     #55a022  swoosh / globe     -> grid-500
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+   Full system notes: docs/DESIGN.md
+   ========================================================================= */
+
+@theme {
+  /* ---- Brand blue: the chassis. Trust, structure, navigation. ---------- */
+  --color-navy-50: #eff5ff;
+  --color-navy-100: #dbe8fe;
+  --color-navy-200: #bfd7fe;
+  --color-navy-300: #93bbfd;
+  --color-navy-400: #4f93e8;
+  --color-navy-500: #1f6fd6;
+  --color-navy-600: #0153b7;
+  --color-navy-700: #073f96;
+  --color-navy-800: #032f7f;
+  --color-navy-900: #08245f;
+  --color-navy-950: #04162f;
+
+  /* ---- Solar gold: energy, output, the one call to action. ------------- */
+  --color-solar-50: #fffaeb;
+  --color-solar-100: #fff2c6;
+  --color-solar-200: #ffe488;
+  --color-solar-300: #ffd54a;
+  --color-solar-400: #fcd012;
+  --color-solar-500: #f0ab00;
+  --color-solar-600: #cf8302;
+  --color-solar-700: #a55c06;
+  --color-solar-800: #86480d;
+  --color-solar-900: #713b11;
+
+  /* ---- Ember: sale and urgency only. Never a primary action. ----------- */
+  --color-ember-50: #fff6ed;
+  --color-ember-100: #ffe9d2;
+  --color-ember-300: #fbb765;
+  --color-ember-500: #f49518;
+  --color-ember-600: #dc7a0a;
+  --color-ember-700: #b25c0b;
+
+  /* ---- Grid green: status only. In stock, verified, savings. ----------- */
+  --color-grid-50: #f3fbe9;
+  --color-grid-100: #e2f5cd;
+  --color-grid-200: #c6ea9f;
+  --color-grid-300: #a1da68;
+  --color-grid-400: #7cc43c;
+  --color-grid-500: #55a022;
+  --color-grid-600: #468318;
+  --color-grid-700: #376417;
+  --color-grid-800: #2e5018;
+  --color-grid-900: #274318;
+
+  /* ---- Alert red: not in the logo. Warm brick, sits beside the ember. -- */
+  --color-alert-50: #fef3f1;
+  --color-alert-100: #fde0dd;
+  --color-alert-500: #db4a34;
+  --color-alert-600: #c62f1e;
+  --color-alert-700: #a32316;
+
+  /* ---- Neutrals: greys tilted toward navy so nothing reads as dirt. ---- */
+  --color-slate-50: #f6f7f9;
+  --color-slate-100: #eef0f4;
+  --color-slate-200: #e2e6ec;
+  --color-slate-300: #cbd2dd;
+  --color-slate-400: #9aa5b8;
+  --color-slate-500: #6f7c91;
+  --color-slate-600: #545f73;
+  --color-slate-700: #3f4959;
+  --color-slate-800: #2a3240;
+  --color-slate-900: #1a202b;
+  --color-slate-950: #0d1219;
+
+  /* Never pure black. Ink is navy at the bottom of the ramp. */
+  --color-ink: #0c1524;
+  /* Warm paper. A hair of yellow under cool blue makes the blue read richer. */
+  --color-paper: #fbfaf6;
+
+  /* ---- Type -----------------------------------------------------------
+     Archivo - industrial grotesk, signage lineage. Headings, prices,
+               buttons: anything that should feel stamped onto equipment.
+     Inter   - dense spec tables on cheap Android screens. Everything else.
+     System mono - SKUs and order references. No third webfont.           */
+  --font-display: var(--font-archivo), "Archivo", system-ui, sans-serif;
+  --font-sans: var(--font-inter), "Inter", system-ui, -apple-system, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  /* Display sizes are fluid: one token spans 360px to 1440px. */
+  --text-display-1: clamp(2.5rem, 1.55rem + 4.2vw, 4.5rem);
+  --text-display-1--line-height: 0.95;
+  --text-display-1--letter-spacing: -0.035em;
+  --text-display-1--font-weight: 800;
+
+  --text-display-2: clamp(2rem, 1.45rem + 2.5vw, 3.25rem);
+  --text-display-2--line-height: 1;
+  --text-display-2--letter-spacing: -0.03em;
+  --text-display-2--font-weight: 800;
+
+  --text-display-3: clamp(1.625rem, 1.35rem + 1.25vw, 2.25rem);
+  --text-display-3--line-height: 1.1;
+  --text-display-3--letter-spacing: -0.02em;
+  --text-display-3--font-weight: 700;
+
+  --text-title: 1.375rem;
+  --text-title--line-height: 1.25;
+  --text-title--letter-spacing: -0.015em;
+  --text-title--font-weight: 700;
+
+  --text-subtitle: 1.0625rem;
+  --text-subtitle--line-height: 1.4;
+  --text-subtitle--letter-spacing: -0.01em;
+  --text-subtitle--font-weight: 600;
+
+  /* The instrument label. 11px, caps, wide. Eyebrows and spec keys. */
+  --text-micro: 0.6875rem;
+  --text-micro--line-height: 1.45;
+  --text-micro--letter-spacing: 0.1em;
+  --text-micro--font-weight: 600;
+
+  /* ---- Radii: squared off. Hardware, not bubblegum. -------------------- */
+  --radius-xs: 0.25rem;
+  --radius-sm: 0.375rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
+  --radius-2xl: 1.5rem;
+
+  /* ---- Shadow: navy-tinted and rationed. Hairlines do most of the work. */
+  --shadow-xs: 0 1px 2px rgb(12 21 36 / 0.06);
+  --shadow-sm: 0 1px 3px rgb(12 21 36 / 0.08), 0 1px 2px -1px rgb(12 21 36 / 0.05);
+  --shadow-md: 0 8px 24px -10px rgb(12 21 36 / 0.18), 0 2px 6px -2px rgb(12 21 36 / 0.08);
+  --shadow-lg: 0 28px 56px -20px rgb(12 21 36 / 0.28), 0 4px 12px -4px rgb(12 21 36 / 0.1);
+  --shadow-solar: 0 10px 28px -10px rgb(240 171 0 / 0.55);
+
+  /* ---- Motion: short, ease-out, never bouncy. -------------------------- */
+  --ease-out: cubic-bezier(0.2, 0.8, 0.3, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+
+  /* A sweep, not a pulse: pulsing blocks read as broken on slow hardware. */
+  --animate-shimmer: shimmer 1.6s infinite;
+  @keyframes shimmer {
+    100% {
+      transform: translateX(100%);
+    }
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+/* ============================================================================
+   Semantic layer. Components reference these, never the raw ramp - so a
+   palette change is one edit here, not a find-and-replace across the app.
+   ========================================================================= */
+:root {
+  color-scheme: light;
+
+  --bg-page: var(--color-paper);
+  --bg-surface: #ffffff;
+  --bg-sunken: var(--color-slate-50);
+  --bg-chassis: var(--color-navy-900);
+  --bg-chassis-raised: var(--color-navy-800);
+
+  --text-strong: var(--color-ink);
+  --text-default: #2b3547;
+  --text-muted: var(--color-slate-500);
+  --text-subtle: var(--color-slate-400);
+  --text-on-chassis: #e9f0fd;
+  --text-on-chassis-muted: #9db4e0;
+
+  --line: var(--color-slate-200);
+  --line-strong: var(--color-slate-300);
+  --line-on-chassis: rgb(255 255 255 / 0.15);
+
+  --accent: var(--color-solar-400);
+  --accent-hover: var(--color-solar-300);
+  --accent-press: var(--color-solar-500);
+  --accent-ink: var(--color-navy-900);
+
+  --link: var(--color-navy-600);
+  --focus: var(--color-navy-500);
+}
+
+/* Map semantics into Tailwind so bg-surface, text-muted and border-line all
+   exist as utilities. `inline` keeps the var reference live. */
+@theme inline {
+  --color-page: var(--bg-page);
+  --color-surface: var(--bg-surface);
+  --color-sunken: var(--bg-sunken);
+  --color-chassis: var(--bg-chassis);
+  --color-chassis-raised: var(--bg-chassis-raised);
+
+  --color-strong: var(--text-strong);
+  --color-default: var(--text-default);
+  --color-muted: var(--text-muted);
+  --color-subtle: var(--text-subtle);
+  --color-on-chassis: var(--text-on-chassis);
+  --color-on-chassis-muted: var(--text-on-chassis-muted);
+
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-line-on-chassis: var(--line-on-chassis);
+
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-press: var(--accent-press);
+  --color-accent-ink: var(--accent-ink);
+  --color-focus: var(--focus);
+}
+
+/* ========================================================================= */
+
+@layer base {
+  * {
+    border-color: var(--line);
+  }
+
+  html {
+    scrollbar-gutter: stable;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    background-color: var(--bg-page);
+    color: var(--text-default);
+    font-family: var(--font-sans);
+    font-synthesis-weight: none;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  h1, h2, h3, h4 {
+    font-family: var(--font-display);
+    color: var(--text-strong);
+    text-wrap: balance;
+  }
+
+  p {
+    text-wrap: pretty;
+  }
+
+  /* One focus style for the whole app. Never removed, only moved. */
+  :focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+    border-radius: var(--radius-xs);
+  }
+
+  ::selection {
+    background-color: var(--color-solar-200);
+    color: var(--color-ink);
+  }
+
+  /* Numbers in this shop are specifications, not prose. Line them up. */
+  :is(table, th, td, time, data, output) {
+    font-variant-numeric: tabular-nums;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, ::before, ::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+/* ============================================================================
+   Signature utilities. Deliberately few - each is a decision, not a knob.
+   ========================================================================= */
+
+/* The sun. One per page, maximum. Anchors a hero or a section header, and is
+   the only gradient in the system; used twice it stops meaning anything. */
+@utility sun-bloom {
+  background-image:
+    radial-gradient(60% 70% at 78% 0%, rgb(252 208 18 / 0.28) 0%, rgb(252 208 18 / 0) 70%),
+    radial-gradient(45% 60% at 92% 12%, rgb(244 149 24 / 0.16) 0%, rgb(244 149 24 / 0) 72%);
+}
+
+/* Same sun, on navy. Painted straight onto the chassis, translucent gold
+   mixes with the blue underneath and turns olive; screen blending keeps it
+   a warm light instead of a stain. Use as an overlay element, not a
+   background — mix-blend-mode needs something to blend with. */
+@utility sun-bloom-dark {
+  background-image:
+    /* Hot core: a pale gold, not the saturated one — screened over navy, a
+       deep gold turns to mud, a pale one turns to light. */
+    radial-gradient(34% 42% at 87% -6%, rgb(255 236 170 / 0.6) 0%, rgb(255 236 170 / 0) 60%),
+    /* Cool halo, so the corner lifts instead of staining. */
+    radial-gradient(72% 82% at 93% -2%, rgb(79 147 232 / 0.3) 0%, rgb(79 147 232 / 0) 72%);
+  mix-blend-mode: screen;
+}
+
+/* Gold hairline along the top edge - marks the primary band on dark chassis. */
+@utility edge-solar {
+  box-shadow: inset 0 2px 0 0 var(--color-solar-400);
+}
+
+/* Prices, capacities, order numbers: even digit widths without a mono face. */
+@utility numeric {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
 }
