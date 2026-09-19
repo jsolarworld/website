@@ -39,3 +39,9 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# prisma
+/generated/prisma
+
+# client data (customer phone numbers, chat export)
+/chat

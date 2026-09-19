@@ -1,0 +1,565 @@
+datasource db {
+  provider = "postgresql"
+}
+
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+// All money is whole naira (Int). Convert to kobo only when talking to Paystack.
+
+// ─── Auth (Better Auth) ──────────────────────────────────────────────────────
+// Core tables follow Better Auth's default schema; after wiring auth, re-run its
+// CLI generate and reconcile any differences with this file.
+
+enum Role {
+  CUSTOMER
+  OWNER
+  STORE_MANAGER
+  SALES_REP
+  CONTENT_EDITOR
+}
+
+model User {
+  id               String   @id
+  name             String
+  email            String   @unique
+  emailVerified    Boolean  @default(false)
+  image            String?
+  phone            String?
+  role             Role     @default(CUSTOMER)
+  twoFactorEnabled Boolean  @default(false)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  sessions   Session[]
+  accounts   Account[]
+  twoFactors TwoFactor[]
+  orders     Order[]
+  leads      Lead[]           @relation("LeadAssignee")
+  bookings   ServiceBooking[] @relation("BookingTechnician")
+  posts      Post[]
+  auditLogs  AuditLog[]
+
+  @@map("user")
+}
+
+model Session {
+  id        String   @id
+  expiresAt DateTime
+  token     String   @unique
+  ipAddress String?
+  userAgent String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@map("session")
+}
+
+model Account {
+  id                    String    @id
+  accountId             String
+  providerId            String
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@index([userId])
+  @@map("account")
+}
+
+model Verification {
+  id         String   @id
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([identifier])
+  @@map("verification")
+}
+
+model TwoFactor {
+  id          String @id
+  secret      String
+  backupCodes String
+  userId      String
+  user        User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("twoFactor")
+}
+
+// ─── Catalogue ───────────────────────────────────────────────────────────────
+
+enum ProductKind {
+  PRODUCT
+  PACKAGE
+}
+
+enum PublishStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum Chemistry {
+  LITHIUM
+  TUBULAR
+}
+
+model Category {
+  id           String    @id @default(cuid())
+  slug         String    @unique
+  name         String
+  intro        String?
+  /// Spec fields for this category, e.g. [{ key: "ratedWatts", label: "Rated power", unit: "W", filterable: true }]
+  specTemplate Json      @default("[]")
+  sortOrder    Int       @default(0)
+  products     Product[]
+}
+
+model Brand {
+  id       String    @id @default(cuid())
+  slug     String    @unique
+  name     String
+  products Product[]
+}
+
+/// Products and packages share one table so /products/:slug stays flat and the cart handles both.
+model Product {
+  id                 String        @id @default(cuid())
+  kind               ProductKind   @default(PRODUCT)
+  slug               String        @unique
+  sku                String?       @unique
+  name               String
+  description        String?
+  categoryId         String
+  category           Category      @relation(fields: [categoryId], references: [id])
+  brandId            String?
+  brand              Brand?        @relation(fields: [brandId], references: [id])
+  priceNgn           Int
+  salePriceNgn       Int?
+  stock              Int           @default(0)
+  lowStockThreshold  Int           @default(2)
+  /// Show "available on request" instead of a stock count.
+  availableOnRequest Boolean       @default(false)
+  /// Values for the category's specTemplate. Engine-relevant numbers for inverters/batteries (rated continuous watts, Wh) live here.
+  specs              Json          @default("{}")
+  warranty           String?
+  datasheetUrl       String?
+  weightKg           Float?
+  status             PublishStatus @default(DRAFT)
+  featured           Boolean       @default(false)
+  seoTitle           String?
+  seoDescription     String?
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+
+  images      ProductImage[]
+  packageSpec PackageSpec?
+  /// Components, when this product is a package.
+  components  PackageItem[]  @relation("PackageComponents")
+  /// Packages that include this product.
+  usedIn      PackageItem[]  @relation("ComponentOf")
+  orderItems  OrderItem[]
+
+  @@index([categoryId, status])
+  @@index([brandId])
+}
+
+model ProductImage {
+  id        String  @id @default(cuid())
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  /// Cloudinary URL.
+  url       String
+  alt       String
+  sortOrder Int     @default(0)
+
+  @@index([productId])
+}
+
+/// The capacity fields the quote engine reads (PRD ADM-05). Only packages with approved = true are ever recommended.
+model PackageSpec {
+  productId           String    @id
+  product             Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  chemistry           Chemistry
+  inverterContinuousW Int
+  inverterSurgeW      Int
+  batteryWh           Int
+  arrayW              Int
+  whatItCanPower      String?
+  approved            Boolean   @default(false)
+  approvedById        String?
+  approvedAt          DateTime?
+}
+
+model PackageItem {
+  id          String  @id @default(cuid())
+  packageId   String
+  package     Product @relation("PackageComponents", fields: [packageId], references: [id], onDelete: Cascade)
+  componentId String
+  component   Product @relation("ComponentOf", fields: [componentId], references: [id])
+  quantity    Int     @default(1)
+
+  @@unique([packageId, componentId])
+}
+
+// ─── Quote tool and leads ────────────────────────────────────────────────────
+
+enum ApplianceCategory {
+  LIGHTING
+  COOLING
+  ENTERTAINMENT
+  KITCHEN
+  WORK
+  WATER
+  SECURITY
+}
+
+model Appliance {
+  id        String            @id @default(cuid())
+  slug      String            @unique
+  name      String
+  category  ApplianceCategory
+  watts     Int
+  dutyCycle Float             @default(1)
+  surge     Float             @default(1)
+  highDraw  Boolean           @default(false)
+  sortOrder Int               @default(0)
+}
+
+enum LeadSource {
+  QUOTE
+  CONTACT_FORM
+  BOOKING
+  WHATSAPP
+}
+
+enum LeadStatus {
+  NEW
+  CONTACTED
+  INSPECTION_BOOKED
+  WON
+  LOST
+}
+
+model Lead {
+  id           String     @id @default(cuid())
+  source       LeadSource
+  status       LeadStatus @default(NEW)
+  name         String?
+  phone        String
+  email        String?
+  message      String?
+  /// Consent to follow-up, required by the quote flow.
+  consent      Boolean    @default(false)
+  assigneeId   String?
+  assignee     User?      @relation("LeadAssignee", fields: [assigneeId], references: [id])
+  saleValueNgn Int?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  quotes Quote[]
+  notes  LeadNote[]
+
+  @@index([status, createdAt])
+  @@index([phone])
+}
+
+model LeadNote {
+  id        String    @id @default(cuid())
+  leadId    String
+  lead      Lead      @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  authorId  String?
+  body      String
+  remindAt  DateTime?
+  createdAt DateTime  @default(now())
+}
+
+/// A saved quote: a snapshot, so later price or setting changes never rewrite what the customer saw.
+model Quote {
+  id             String     @id @default(cuid())
+  /// Shareable reference used in /solar-quote/:reference.
+  reference      String     @unique
+  leadId         String?
+  lead           Lead?      @relation(fields: [leadId], references: [id])
+  inputs         Json
+  needs          Json
+  /// Recommended / budget / headroom options with package ids and prices at this moment.
+  result         Json
+  chemistry      Chemistry?
+  engineerReview Boolean    @default(false)
+  validUntil     DateTime
+  createdAt      DateTime   @default(now())
+
+  orders Order[]
+}
+
+/// Admin-editable key/value config: quote sizing defaults, VAT on/off, bank details, WhatsApp number.
+model Setting {
+  key       String   @id
+  value     Json
+  updatedAt DateTime @updatedAt
+}
+
+// ─── Orders and payments ─────────────────────────────────────────────────────
+
+enum OrderStatus {
+  PENDING_PAYMENT
+  PAID
+  PROCESSING
+  READY_FOR_PICKUP
+  OUT_FOR_DELIVERY
+  COMPLETED
+  CANCELLED
+  REFUNDED
+}
+
+enum FulfilmentMethod {
+  PICKUP
+  LAGOS_DELIVERY
+  INTERSTATE_DELIVERY
+}
+
+enum PaymentMethod {
+  PAYSTACK
+  BANK_TRANSFER
+}
+
+enum PaymentStatus {
+  PENDING
+  /// Bank transfer: proof uploaded, staff have not yet confirmed funds.
+  PROOF_SUBMITTED
+  CONFIRMED
+  FAILED
+  REFUNDED
+}
+
+model Order {
+  id              String           @id @default(cuid())
+  /// Human-facing number for /track-order.
+  orderNumber     String           @unique
+  userId          String?
+  user            User?            @relation(fields: [userId], references: [id])
+  quoteId         String?
+  quote           Quote?           @relation(fields: [quoteId], references: [id])
+  status          OrderStatus      @default(PENDING_PAYMENT)
+  fullName        String
+  phone           String
+  email           String
+  fulfilment      FulfilmentMethod
+  deliveryState   String?
+  deliveryArea    String?
+  deliveryAddress String?
+  landmark        String?
+  notes           String?
+  subtotalNgn     Int
+  deliveryFeeNgn  Int              @default(0)
+  taxNgn          Int              @default(0)
+  totalNgn        Int
+  /// Unpaid orders expire and release held stock.
+  expiresAt       DateTime?
+  paidAt          DateTime?
+  termsAcceptedAt DateTime
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  items    OrderItem[]
+  payments Payment[]
+  events   OrderEvent[]
+  booking  ServiceBooking?
+
+  @@index([status, createdAt])
+  @@index([phone])
+  @@index([email])
+}
+
+model OrderItem {
+  id           String  @id @default(cuid())
+  orderId      String
+  order        Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId    String
+  product      Product @relation(fields: [productId], references: [id])
+  /// Snapshots, so later edits to the product don't change past orders.
+  name         String
+  unitPriceNgn Int
+  quantity     Int
+
+  @@index([orderId])
+}
+
+model Payment {
+  id              String        @id @default(cuid())
+  orderId         String
+  order           Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  method          PaymentMethod
+  status          PaymentStatus @default(PENDING)
+  amountNgn       Int
+  /// Paystack transaction reference. Unique so verifying twice can only ever confirm one payment.
+  reference       String?       @unique
+  /// Full Paystack verify response, kept for disputes.
+  gatewayResponse Json?
+  /// Cloudinary URL of the uploaded transfer receipt.
+  proofUrl        String?
+  confirmedById   String?
+  confirmedAt     DateTime?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@index([orderId])
+}
+
+/// Timestamped status history (PRD ORD-01). actorId is null for customer- or system-driven changes.
+model OrderEvent {
+  id        String       @id @default(cuid())
+  orderId   String
+  order     Order        @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  from      OrderStatus?
+  to        OrderStatus
+  actorId   String?
+  note      String?
+  createdAt DateTime     @default(now())
+
+  @@index([orderId, createdAt])
+}
+
+enum DeliveryZoneKind {
+  LAGOS_ZONE
+  STATE
+}
+
+model DeliveryZone {
+  id       String           @id @default(cuid())
+  kind     DeliveryZoneKind
+  name     String
+  feeNgn   Int
+  timeline String?
+  active   Boolean          @default(true)
+
+  @@unique([kind, name])
+}
+
+// ─── Services ────────────────────────────────────────────────────────────────
+
+enum BookingStatus {
+  NEW
+  CONFIRMED
+  SCHEDULED
+  DONE
+  CANCELLED
+}
+
+model Service {
+  id           String           @id @default(cuid())
+  slug         String           @unique
+  name         String
+  summary      String
+  body         String?
+  fromPriceNgn Int?
+  sortOrder    Int              @default(0)
+  published    Boolean          @default(true)
+  bookings     ServiceBooking[]
+}
+
+model ServiceBooking {
+  id            String        @id @default(cuid())
+  serviceId     String
+  service       Service       @relation(fields: [serviceId], references: [id])
+  status        BookingStatus @default(NEW)
+  name          String
+  phone         String
+  email         String?
+  state         String
+  area          String
+  address       String
+  preferredDate DateTime?
+  timeWindow    String?
+  notes         String?
+  /// Cloudinary URLs of site photos.
+  photos        Json          @default("[]")
+  technicianId  String?
+  technician    User?         @relation("BookingTechnician", fields: [technicianId], references: [id])
+  /// Set when installation was bought with an order (PRD ORD-05).
+  orderId       String?       @unique
+  order         Order?        @relation(fields: [orderId], references: [id])
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  @@index([status, preferredDate])
+}
+
+// ─── Content and site plumbing ───────────────────────────────────────────────
+
+model Post {
+  id             String        @id @default(cuid())
+  slug           String        @unique
+  title          String
+  excerpt        String?
+  body           String
+  category       String?
+  tags           String[]
+  featuredImage  String?
+  featuredAlt    String?
+  status         PublishStatus @default(DRAFT)
+  publishedAt    DateTime?
+  authorId       String?
+  author         User?         @relation(fields: [authorId], references: [id])
+  seoTitle       String?
+  seoDescription String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  @@index([status, publishedAt])
+}
+
+model Testimonial {
+  id        String   @id @default(cuid())
+  name      String
+  location  String?
+  quote     String
+  published Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
+model Subscriber {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  consentAt DateTime @default(now())
+}
+
+/// Created whenever a product, category or post slug changes (PRD SEO-03).
+model Redirect {
+  id       String @id @default(cuid())
+  fromPath String @unique
+  toPath   String
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  actorId   String?
+  actor     User?    @relation(fields: [actorId], references: [id])
+  action    String
+  entity    String
+  entityId  String
+  before    Json?
+  after     Json?
+  createdAt DateTime @default(now())
+
+  @@index([entity, entityId])
+  @@index([createdAt])
+}
