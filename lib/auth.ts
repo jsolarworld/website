@@ -12,6 +12,9 @@ import { SITE } from "./site";
 export const auth = betterAuth({
   appName: SITE.shortName,
   baseURL: process.env.BETTER_AUTH_URL ?? SITE.url,
+  // Next picks the next free port when 3000 is busy (3001, 3002...), and Better Auth rejects any origin
+  // it does not trust. Any localhost port is trusted in development only; production trusts baseURL alone.
+  trustedOrigins: process.env.NODE_ENV === "production" ? [] : ["http://localhost:*"],
   database: prismaAdapter(db, { provider: "postgresql" }),
   emailAndPassword: {
     enabled: true,
