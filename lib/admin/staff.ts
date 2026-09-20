@@ -34,3 +34,23 @@ export async function createStaffUser(input: { email: string; name: string; role
   });
   return user;
 }
+
+/** Replace a staff member's password with a new temporary one, clear their authenticator, and sign them out everywhere. */
+export async function resetStaffSignIn(userId: string, temporaryPassword: string) {
+  const ctx = await auth.$context;
+  const hash = await ctx.password.hash(temporaryPassword);
+  await db.$transaction([
+    db.account.updateMany({ where: { userId, providerId: "credential" }, data: { password: hash } }),
+    db.twoFactor.deleteMany({ where: { userId } }),
+    db.user.update({ where: { id: userId }, data: { twoFactorEnabled: false } }),
+    db.session.deleteMany({ where: { userId } }),
+  ]);
+}
+
+/** Change a role, or take admin access away entirely (role becomes CUSTOMER). Always signs the person out. */
+export async function setStaffAccess(userId: string, role: StaffRole | "REMOVED") {
+  await db.$transaction([
+    db.user.update({ where: { id: userId }, data: { role: role === "REMOVED" ? "CUSTOMER" : role } }),
+    db.session.deleteMany({ where: { userId } }),
+  ]);
+}

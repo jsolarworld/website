@@ -1,3 +1,4 @@
+import { ChangePasswordForm } from "@/components/admin/change-password-form";
 import { SecurityPanel } from "@/components/admin/security-panel";
 import { Container, Notice } from "@/components/ui";
 import { requireStaff } from "@/lib/admin/guard";
@@ -15,8 +16,9 @@ export default async function SecurityPage() {
           Staff accounts need a second sign-in step. Install Google Authenticator, Microsoft Authenticator or Authy on your phone first.
         </Notice>
       )}
-      <div className="mt-8">
+      <div className="mt-8 space-y-8">
         <SecurityPanel enabled={staff.twoFactorEnabled} />
+        <ChangePasswordForm />
       </div>
     </Container>
   );

@@ -1,3 +1,5 @@
+import { Analytics } from "@vercel/analytics/next";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 import type { Metadata } from "next";
 import { Archivo, Inter } from "next/font/google";
 import { SITE } from "@/lib/site";
@@ -45,7 +47,18 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       className={`${archivo.variable} ${inter.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
-        <SiteChrome header={<SiteHeader />} footer={<SiteFooter />} floating={<WhatsAppButton />}>
+        <SiteChrome
+          header={<SiteHeader />}
+          footer={<SiteFooter />}
+          floating={
+            <>
+              <WhatsAppButton />
+              {/* Visitor and speed metrics for the public site only; SiteChrome drops all of this under /admin. */}
+              <Analytics />
+              <SpeedInsights />
+            </>
+          }
+        >
           {children}
         </SiteChrome>
       </body>
