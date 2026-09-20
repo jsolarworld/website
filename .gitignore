@@ -45,3 +45,6 @@ next-env.d.ts
 
 # client data (customer phone numbers, chat export)
 /chat
+
+# alternate build/dev cache (NEXT_DIST_DIR)
+/.next-*/
