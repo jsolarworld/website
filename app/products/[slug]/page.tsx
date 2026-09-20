@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import { notFound, permanentRedirect } from "next/navigation";
-import { Badge, Card, CardBody, Container, Eyebrow, Notice, Price, Section, SpecList, buttonClass } from "@/components/ui";
+import { Badge, Button, Card, CardBody, Container, Eyebrow, Input, Notice, Price, Section, SpecList, buttonClass } from "@/components/ui";
+import { addToCart } from "@/app/cart/actions";
 import { effectivePrice, getProduct, stockStatus } from "@/lib/catalogue";
 import { db } from "@/lib/db";
 import { SITE, formatNaira, jsonLd, whatsappLink } from "@/lib/site";
@@ -61,6 +62,8 @@ export default async function ProductPage({ params }: Props) {
   if (p.sku) specRows.push({ label: "SKU", value: p.sku });
 
   const url = `${SITE.url}/products/${p.slug}`;
+  // Only in-stock items that are not "on request" can go in the cart.
+  const purchasable = !p.availableOnRequest && p.stock > 0;
   const structured = [
     {
       "@context": "https://schema.org",
@@ -131,20 +134,47 @@ export default async function ProductPage({ params }: Props) {
               Price in naira, no VAT added. It is locked once your payment is confirmed.
             </p>
 
-            <div className="mt-6 flex flex-wrap gap-3">
-              {/* Cart and checkout are the next build step; until then WhatsApp is the way to buy. */}
-              <a
-                className={buttonClass({ variant: "primary", size: "lg" })}
-                href={whatsappLink(`Hello ${SITE.shortName}, I want to buy: ${p.name} (${url})`)}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                Order on WhatsApp
-              </a>
-              <Link href="/solar-quote" className={buttonClass({ variant: "outline", size: "lg" })}>
-                Not sure it fits? Get a quote
-              </Link>
-            </div>
+            {purchasable ? (
+              <div className="mt-6 space-y-3">
+                <form action={addToCart} className="flex flex-wrap items-end gap-3">
+                  <input type="hidden" name="productId" value={p.id} />
+                  <label className="text-xs text-muted">
+                    Quantity
+                    <Input type="number" name="quantity" min={1} max={Math.min(p.stock, 99)} defaultValue={1} className="mt-1 h-12 w-24" />
+                  </label>
+                  <Button type="submit" variant="primary" size="lg">
+                    Add to cart
+                  </Button>
+                </form>
+                <div className="flex flex-wrap gap-3">
+                  <a
+                    className={buttonClass({ variant: "outline" })}
+                    href={whatsappLink(`Hello ${SITE.shortName}, I have a question about: ${p.name} (${url})`)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    Ask on WhatsApp
+                  </a>
+                  <Link href="/solar-quote" className={buttonClass({ variant: "outline" })}>
+                    Not sure it fits? Get a quote
+                  </Link>
+                </div>
+              </div>
+            ) : (
+              <div className="mt-6 flex flex-wrap gap-3">
+                <a
+                  className={buttonClass({ variant: "primary", size: "lg" })}
+                  href={whatsappLink(`Hello ${SITE.shortName}, I want to order: ${p.name} (${url})`)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  {status.key === "out" ? "Ask when it's back" : "Order on WhatsApp"}
+                </a>
+                <Link href="/solar-quote" className={buttonClass({ variant: "outline", size: "lg" })}>
+                  Not sure it fits? Get a quote
+                </Link>
+              </div>
+            )}
 
             {p.description && <p className="mt-8 leading-relaxed">{p.description}</p>}
 

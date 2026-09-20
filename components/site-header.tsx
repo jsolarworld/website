@@ -1,5 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
+import { CartLink } from "@/components/cart-link";
 import { Container, buttonClass } from "@/components/ui";
 import { SITE, telLink } from "@/lib/site";
 
@@ -36,7 +37,8 @@ export function SiteHeader() {
           ))}
         </nav>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
+          <CartLink />
           <a href={telLink(SITE.phones[0])} className="hidden text-sm text-on-chassis-muted hover:text-white lg:block">
             {SITE.phones[0]}
           </a>

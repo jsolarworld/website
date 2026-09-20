@@ -23,3 +23,24 @@ export function signParams(params: Record<string, string | number>, apiSecret: s
 
 export const UPLOAD_FOLDER = "j-solar-world/products";
 export const ALLOWED_FORMATS = "jpg,jpeg,png,webp";
+
+export const PROOF_FOLDER = "j-solar-world/proofs";
+
+/** Upload one image from the server (used for transfer receipts, so no public signing endpoint is needed). */
+export async function uploadImageFromServer(file: Blob, filename: string, folder: string): Promise<string> {
+  const cfg = parseCloudinaryUrl(process.env.CLOUDINARY_URL);
+  if (!cfg) throw new Error("Image uploads are not configured");
+  const timestamp = Math.floor(Date.now() / 1000);
+  const params = { allowed_formats: ALLOWED_FORMATS, folder, timestamp };
+  const body = new FormData();
+  body.set("file", file, filename);
+  body.set("api_key", cfg.apiKey);
+  body.set("timestamp", String(timestamp));
+  body.set("signature", signParams(params, cfg.apiSecret));
+  body.set("folder", folder);
+  body.set("allowed_formats", ALLOWED_FORMATS);
+  const res = await fetch(`https://api.cloudinary.com/v1_1/${cfg.cloudName}/image/upload`, { method: "POST", body });
+  const json = (await res.json().catch(() => null)) as { secure_url?: string; error?: { message?: string } } | null;
+  if (!res.ok || !json?.secure_url) throw new Error(json?.error?.message ?? "Upload failed");
+  return json.secure_url;
+}

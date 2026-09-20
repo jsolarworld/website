@@ -13,6 +13,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   return [
     { url: at("/") },
     { url: at("/products") },
+    { url: at("/solar-quote") },
+    { url: at("/track-order") },
+    { url: at("/delivery") },
+    { url: at("/returns-and-warranty") },
+    { url: at("/terms") },
+    { url: at("/privacy") },
     ...categories.map((c) => ({ url: at(`/categories/${c.slug}`) })),
     ...products.map((p) => ({ url: at(`/products/${p.slug}`), lastModified: p.updatedAt })),
   ];
