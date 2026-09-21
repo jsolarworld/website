@@ -7,6 +7,7 @@ import { requireStaff } from "@/lib/admin/guard";
 import { can } from "@/lib/admin/permissions";
 import { parseProductForm, type FormErrors, type SpecField } from "@/lib/admin/product-form";
 import { db } from "@/lib/db";
+import { slugify } from "@/lib/slug";
 
 export interface FormState {
   errors?: FormErrors;
@@ -42,6 +43,19 @@ export async function saveProduct(_prev: FormState, formData: FormData): Promise
     if (found.length !== ids.length || ids.includes(id)) {
       return { errors: { components: "Package contents can only be existing products" } };
     }
+  }
+
+  // A brand typed into the form: reuse it if it already exists (same name, any capitals), else create it,
+  // so the next product can simply pick it from the list.
+  if (d.newBrandName) {
+    const slug = slugify(d.newBrandName);
+    if (!slug) return { errors: { brandId: "Use letters or numbers in the brand name" } };
+    let brand = await db.brand.findFirst({ where: { OR: [{ slug }, { name: { equals: d.newBrandName, mode: "insensitive" } }] } });
+    if (!brand) {
+      brand = await db.brand.create({ data: { slug, name: d.newBrandName } });
+      await logAudit({ actorId: staff.id, action: "brand.create", entity: "Brand", entityId: brand.id, after: { name: brand.name } });
+    }
+    d.brandId = brand.id;
   }
 
   const productData = {

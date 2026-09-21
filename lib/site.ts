@@ -3,7 +3,7 @@ export const SITE = {
   shortName: "J Solar World",
   slogan: "Reliable & Trusted Solar Energy Solutions",
   url: process.env.NEXT_PUBLIC_SITE_URL ?? "https://j-solar-world.vercel.app",
-  phones: ["08100362453", "09044871185"],
+  phones: ["09044871185", "08100362453"],
   whatsapp: "2349044871185",
   email: "Jsolarworld2@gmail.com",
   address: "F-Line 1424, Ojo Alaba International Market, Lagos State",

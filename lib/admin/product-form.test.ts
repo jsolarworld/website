@@ -73,6 +73,19 @@ describe("parseProductForm", () => {
     expect(parseProductForm(form({ ...base, media: imageAsVideo }), template).ok).toBe(false);
   });
 
+  it("handles the add-a-new-brand choice", () => {
+    const ok = parseProductForm(form({ ...base, brandId: "__new", newBrand: "  Lvtopsun   Power " }), template);
+    expect(ok.ok && ok.data.brandId).toBeNull();
+    expect(ok.ok && ok.data.newBrandName).toBe("Lvtopsun Power");
+
+    const blank = parseProductForm(form({ ...base, brandId: "__new", newBrand: " " }), template);
+    expect(!blank.ok && blank.errors.brandId).toBeTruthy();
+
+    const existing = parseProductForm(form({ ...base, brandId: "brand_123" }), template);
+    expect(existing.ok && existing.data.brandId).toBe("brand_123");
+    expect(existing.ok && existing.data.newBrandName).toBeNull();
+  });
+
   it("rejects a non-https datasheet link", () => {
     const r = parseProductForm(form({ ...base, datasheetUrl: "javascript:alert(1)" }), template);
     expect(!r.ok && r.errors.datasheetUrl).toBeTruthy();

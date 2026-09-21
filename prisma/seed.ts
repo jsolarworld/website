@@ -43,6 +43,26 @@ const CATEGORIES: { slug: string; name: string; specTemplate: Spec[] }[] = [
     specTemplate: [num("capacityAh", "Capacity", "Ah"), num("voltage", "Voltage", "V")],
   },
   {
+    slug: "drycell-batteries",
+    name: "Drycell Batteries",
+    specTemplate: [num("capacityAh", "Capacity", "Ah"), num("voltage", "Voltage", "V"), text("type", "Type", true)],
+  },
+  {
+    slug: "solar-water-heaters",
+    name: "Solar Water Heaters",
+    specTemplate: [num("capacityLitres", "Tank capacity", "L"), num("tubes", "Number of tubes", "tubes", false), text("type", "Type", true)],
+  },
+  {
+    slug: "inverter-air-conditioners",
+    name: "Inverter Air Conditioners",
+    specTemplate: [num("capacityHp", "Capacity", "HP"), num("coolingBtu", "Cooling", "BTU", false), text("type", "Type", true)],
+  },
+  {
+    slug: "solar-freezers",
+    name: "Solar Freezers",
+    specTemplate: [num("capacityLitres", "Capacity", "L"), text("power", "Power supply", true)],
+  },
+  {
     slug: "solar-panels",
     name: "Solar Panels",
     specTemplate: [num("watts", "Power", "W"), text("type", "Cell type", true), num("voltageVmp", "Vmp", "V", false)],

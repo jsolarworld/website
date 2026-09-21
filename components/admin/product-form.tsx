@@ -5,7 +5,7 @@ import { saveProduct, type FormState } from "@/app/admin/products/actions";
 import { Button, Card, CardBody, Eyebrow, Field, Input, Notice, Select, Textarea } from "@/components/ui";
 import { ComponentsField, type ComponentOption, type ComponentRow } from "./components-field";
 import { MediaField, type MediaItem } from "./media-field";
-import type { SpecField } from "@/lib/admin/product-form";
+import { NEW_BRAND, type SpecField } from "@/lib/admin/product-form";
 
 export interface ProductFormInitial {
   id: string;
@@ -54,6 +54,9 @@ interface Props {
 export function ProductForm({ initial, categories, brands, componentOptions, canApprove, isEdit }: Props) {
   const [state, action, pending] = useActionState<FormState, FormData>(saveProduct, {});
   const [categoryId, setCategoryId] = useState(initial.categoryId);
+  const [brandChoice, setBrandChoice] = useState(initial.brandId);
+  // Controlled, so a failed save does not wipe what was typed (React resets uncontrolled fields after a form action).
+  const [newBrand, setNewBrand] = useState("");
   const e = state.errors ?? {};
   const isPackage = initial.kind === "PACKAGE";
   const template = categories.find((c) => c.id === categoryId)?.specTemplate ?? [];
@@ -83,18 +86,26 @@ export function ProductForm({ initial, categories, brands, componentOptions, can
               </Select>
             )}
           </Field>
-          <Field name="brandId" label="Brand" required={false}>
-            {(f) => (
-              <Select {...f} defaultValue={initial.brandId}>
-                <option value="">No brand</option>
-                {brands.map((b) => (
-                  <option key={b.id} value={b.id}>
-                    {b.name}
-                  </option>
-                ))}
-              </Select>
+          <div className="space-y-3">
+            <Field name="brandId" label="Brand" required={false} error={e.brandId}>
+              {(f) => (
+                <Select {...f} value={brandChoice} onChange={(ev) => setBrandChoice(ev.target.value)}>
+                  <option value="">No brand</option>
+                  {brands.map((b) => (
+                    <option key={b.id} value={b.id}>
+                      {b.name}
+                    </option>
+                  ))}
+                  <option value={NEW_BRAND}>+ Add a new brand…</option>
+                </Select>
+              )}
+            </Field>
+            {brandChoice === NEW_BRAND && (
+              <Field name="newBrand" label="New brand name" hint="It is saved, so you can pick it from the list next time">
+                {(f) => <Input {...f} maxLength={60} autoFocus value={newBrand} onChange={(ev) => setNewBrand(ev.target.value)} />}
+              </Field>
             )}
-          </Field>
+          </div>
           <Field name="sku" label="SKU" required={false} error={e.sku} hint="Your own product code">
             {(f) => <Input {...f} defaultValue={initial.sku} />}
           </Field>

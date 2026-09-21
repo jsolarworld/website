@@ -18,6 +18,8 @@ export interface ProductInput {
   description: string | null;
   categoryId: string;
   brandId: string | null;
+  /** Set when staff typed a brand that is not in the list yet; the server finds or creates it. */
+  newBrandName: string | null;
   priceNgn: number;
   salePriceNgn: number | null;
   stock: number;
@@ -53,6 +55,9 @@ interface FormLike {
   get(name: string): FormDataEntryValue | null;
 }
 
+/** Value of the "Add a new brand" option in the brand list. */
+export const NEW_BRAND = "__new";
+
 const MAX_PRICE = 1_000_000_000;
 
 export function parseProductForm(form: FormLike, specTemplate: SpecField[]): ParseResult {
@@ -85,6 +90,15 @@ export function parseProductForm(form: FormLike, specTemplate: SpecField[]): Par
   const slugRaw = text("slug", 80);
   const slug = slugRaw ?? slugify(name ?? "");
   if (!slug || !/^[a-z0-9]+(-[a-z0-9]+)*$/.test(slug)) errors.slug = "Use lowercase letters, numbers and single hyphens only";
+
+  // "__new" is the "Add a new brand" choice in the brand list; the name comes from a second field.
+  let brandId = text("brandId", 60);
+  let newBrandName: string | null = null;
+  if (brandId === NEW_BRAND) {
+    brandId = null;
+    newBrandName = (text("newBrand", 60) ?? "").replace(/\s+/g, " ") || null;
+    if (!newBrandName || newBrandName.length < 2) errors.brandId = "Type the new brand's name (at least 2 letters)";
+  }
 
   const categoryId = text("categoryId", 60);
   if (!categoryId) errors.categoryId = "Choose a category";
@@ -201,7 +215,8 @@ export function parseProductForm(form: FormLike, specTemplate: SpecField[]): Par
       sku: text("sku", 60),
       description: text("description", 4000),
       categoryId,
-      brandId: text("brandId", 60),
+      brandId,
+      newBrandName,
       priceNgn,
       salePriceNgn,
       stock,
