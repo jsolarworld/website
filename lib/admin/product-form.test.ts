@@ -50,16 +50,27 @@ describe("parseProductForm", () => {
     expect(!bad.ok && bad.errors["spec.ratedKva"]).toBeTruthy();
   });
 
-  it("requires alt text and Cloudinary URLs on images", () => {
-    const good = JSON.stringify([{ url: "https://res.cloudinary.com/x/image/upload/a.jpg", alt: "Front view" }]);
-    expect(parseProductForm(form({ ...base, images: good }), template).ok).toBe(true);
+  it("requires alt text and Cloudinary URLs on photos and videos", () => {
+    const good = JSON.stringify([
+      { kind: "IMAGE", url: "https://res.cloudinary.com/x/image/upload/a.jpg", alt: "Front view" },
+      { kind: "VIDEO", url: "https://res.cloudinary.com/x/video/upload/v1/b.mp4", alt: "Unboxing" },
+    ]);
+    const ok = parseProductForm(form({ ...base, media: good }), template);
+    expect(ok.ok && ok.data.media.map((m) => m.kind)).toEqual(["IMAGE", "VIDEO"]);
 
-    const noAlt = JSON.stringify([{ url: "https://res.cloudinary.com/x/image/upload/a.jpg", alt: " " }]);
-    const r1 = parseProductForm(form({ ...base, images: noAlt }), template);
-    expect(!r1.ok && r1.errors.images).toMatch(/description/);
+    const noAlt = JSON.stringify([{ kind: "IMAGE", url: "https://res.cloudinary.com/x/image/upload/a.jpg", alt: " " }]);
+    const r1 = parseProductForm(form({ ...base, media: noAlt }), template);
+    expect(!r1.ok && r1.errors.media).toMatch(/description/);
 
-    const foreign = JSON.stringify([{ url: "https://evil.example/a.jpg", alt: "x" }]);
-    expect(parseProductForm(form({ ...base, images: foreign }), template).ok).toBe(false);
+    const foreign = JSON.stringify([{ kind: "IMAGE", url: "https://evil.example/a.jpg", alt: "x" }]);
+    expect(parseProductForm(form({ ...base, media: foreign }), template).ok).toBe(false);
+  });
+
+  it("rejects a video whose URL is really an image upload, and the other way round", () => {
+    const videoAsImage = JSON.stringify([{ kind: "VIDEO", url: "https://res.cloudinary.com/x/image/upload/a.jpg", alt: "x" }]);
+    expect(parseProductForm(form({ ...base, media: videoAsImage }), template).ok).toBe(false);
+    const imageAsVideo = JSON.stringify([{ kind: "IMAGE", url: "https://res.cloudinary.com/x/video/upload/a.mp4", alt: "x" }]);
+    expect(parseProductForm(form({ ...base, media: imageAsVideo }), template).ok).toBe(false);
   });
 
   it("rejects a non-https datasheet link", () => {

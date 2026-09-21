@@ -4,7 +4,7 @@ import { useActionState, useState } from "react";
 import { saveProduct, type FormState } from "@/app/admin/products/actions";
 import { Button, Card, CardBody, Eyebrow, Field, Input, Notice, Select, Textarea } from "@/components/ui";
 import { ComponentsField, type ComponentOption, type ComponentRow } from "./components-field";
-import { ImagesField, type ImageItem } from "./images-field";
+import { MediaField, type MediaItem } from "./media-field";
 import type { SpecField } from "@/lib/admin/product-form";
 
 export interface ProductFormInitial {
@@ -29,7 +29,7 @@ export interface ProductFormInitial {
   seoTitle: string;
   seoDescription: string;
   specs: Record<string, string | number>;
-  images: ImageItem[];
+  media: MediaItem[];
   pkg: {
     chemistry: "LITHIUM" | "TUBULAR";
     inverterContinuousW: string;
@@ -200,9 +200,9 @@ export function ProductForm({ initial, categories, brands, componentOptions, can
 
       <Card>
         <CardBody>
-          <Eyebrow>Photos</Eyebrow>
+          <Eyebrow>Photos and videos</Eyebrow>
           <div className="mt-4">
-            <ImagesField initial={initial.images} error={e.images} />
+            <MediaField initial={initial.media} error={e.media} />
           </div>
         </CardBody>
       </Card>

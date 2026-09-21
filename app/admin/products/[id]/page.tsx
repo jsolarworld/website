@@ -26,7 +26,7 @@ export default async function EditProductPage({ params, searchParams }: Props) {
   const [categories, brands, product] = await Promise.all([
     db.category.findMany({ orderBy: { sortOrder: "asc" } }),
     db.brand.findMany({ orderBy: { name: "asc" } }),
-    isNew ? null : db.product.findUnique({ where: { id }, include: { images: { orderBy: { sortOrder: "asc" } }, packageSpec: true, components: true } }),
+    isNew ? null : db.product.findUnique({ where: { id }, include: { media: { orderBy: { sortOrder: "asc" } }, packageSpec: true, components: true } }),
   ]);
   if (!isNew && !product) notFound();
   if (isNew && !canWrite) return notFound();
@@ -61,7 +61,7 @@ export default async function EditProductPage({ params, searchParams }: Props) {
     seoTitle: product?.seoTitle ?? "",
     seoDescription: product?.seoDescription ?? "",
     specs: (product?.specs ?? {}) as Record<string, string | number>,
-    images: product?.images.map((i) => ({ url: i.url, alt: i.alt })) ?? [],
+    media: product?.media.map((m) => ({ kind: m.kind, url: m.url, alt: m.alt })) ?? [],
     pkg: {
       chemistry: product?.packageSpec?.chemistry ?? "LITHIUM",
       inverterContinuousW: s(product?.packageSpec?.inverterContinuousW),

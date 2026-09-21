@@ -22,7 +22,7 @@ export async function saveProduct(_prev: FormState, formData: FormData): Promise
 
   const id = String(formData.get("id") ?? "");
   const existing = id
-    ? await db.product.findUnique({ where: { id }, include: { images: true, packageSpec: true, components: true } })
+    ? await db.product.findUnique({ where: { id }, include: { media: true, packageSpec: true, components: true } })
     : null;
   if (id && !existing) return { message: "That product no longer exists." };
   // A product never turns into a package or back.
@@ -92,9 +92,9 @@ export async function saveProduct(_prev: FormState, formData: FormData): Promise
         ? await tx.product.update({ where: { id: existing.id }, data: productData })
         : await tx.product.create({ data: productData });
 
-      await tx.productImage.deleteMany({ where: { productId: product.id } });
-      if (d.images.length > 0) {
-        await tx.productImage.createMany({ data: d.images.map((img, i) => ({ productId: product.id, url: img.url, alt: img.alt, sortOrder: i })) });
+      await tx.productMedia.deleteMany({ where: { productId: product.id } });
+      if (d.media.length > 0) {
+        await tx.productMedia.createMany({ data: d.media.map((m, i) => ({ productId: product.id, kind: m.kind, url: m.url, alt: m.alt, sortOrder: i })) });
       }
 
       if (d.package) {

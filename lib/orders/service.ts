@@ -3,6 +3,7 @@ import { randomInt } from "node:crypto";
 import type { Prisma } from "../../generated/prisma/client";
 import { effectivePrice } from "../catalogue";
 import { db } from "../db";
+import { coverOf } from "../media";
 import { getOrderSettings } from "../settings";
 import type { CartLine } from "./cart";
 import type { CheckoutInput } from "./checkout-form";
@@ -34,13 +35,14 @@ export async function loadCart(lines: CartLine[]): Promise<CartView> {
   if (lines.length === 0) return { lines: [], subtotalNgn: 0, ok: false };
   const products = await db.product.findMany({
     where: { id: { in: lines.map((l) => l.productId) }, status: "PUBLISHED" },
-    include: { images: { orderBy: { sortOrder: "asc" }, take: 1 } },
+    include: { media: { orderBy: { sortOrder: "asc" } } },
   });
   const byId = new Map(products.map((p) => [p.id, p]));
   const view: CartView["lines"] = [];
   for (const l of lines) {
     const p = byId.get(l.productId);
     if (!p) continue;
+    const cover = coverOf(p.media);
     view.push({
       productId: p.id,
       quantity: l.quantity,
@@ -49,8 +51,8 @@ export async function loadCart(lines: CartLine[]): Promise<CartView> {
       unitPriceNgn: effectivePrice(p),
       stock: p.stock,
       available: !p.availableOnRequest && p.stock >= l.quantity,
-      imageUrl: p.images[0]?.url ?? null,
-      imageAlt: p.images[0]?.alt ?? p.name,
+      imageUrl: cover?.url ?? null,
+      imageAlt: cover?.alt ?? p.name,
     });
   }
   const { subtotalNgn } = orderTotals(view);

@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
-import Image from "next/image";
 import Link from "next/link";
 import { notFound, permanentRedirect } from "next/navigation";
 import { Badge, Button, Card, CardBody, Container, Eyebrow, Input, Notice, Price, Section, SpecList, buttonClass } from "@/components/ui";
 import { addToCart } from "@/app/cart/actions";
+import { ProductGallery } from "@/components/product-gallery";
 import { effectivePrice, getProduct, stockStatus } from "@/lib/catalogue";
 import { db } from "@/lib/db";
+import { coverOf } from "@/lib/media";
 import { SITE, formatNaira, jsonLd, whatsappLink } from "@/lib/site";
 
 export const revalidate = 60;
@@ -29,7 +30,7 @@ interface SpecField {
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const p = await getProduct((await params).slug);
   if (!p) return {};
-  const image = p.images[0]?.url;
+  const image = coverOf(p.media)?.url;
   return {
     title: p.seoTitle ?? p.name,
     description:
@@ -72,7 +73,7 @@ export default async function ProductPage({ params }: Props) {
       description: p.description ?? undefined,
       sku: p.sku ?? undefined,
       brand: p.brand ? { "@type": "Brand", name: p.brand.name } : undefined,
-      image: p.images.map((i) => i.url),
+      image: p.media.filter((m) => m.kind === "IMAGE").map((m) => m.url),
       offers: {
         "@type": "Offer",
         url,
@@ -106,21 +107,7 @@ export default async function ProductPage({ params }: Props) {
         </nav>
 
         <div className="mt-6 grid gap-8 lg:grid-cols-2 lg:gap-12">
-          <div>
-            {p.images.length > 0 ? (
-              <ul className="flex snap-x snap-mandatory gap-3 overflow-x-auto lg:grid lg:grid-cols-2 lg:overflow-visible">
-                {p.images.map((img, i) => (
-                  <li key={img.id} className={`relative aspect-square w-full shrink-0 snap-center rounded-lg border border-line bg-surface ${i === 0 ? "lg:col-span-2" : ""}`}>
-                    <Image src={img.url} alt={img.alt} fill priority={i === 0} sizes="(min-width: 1024px) 50vw, 100vw" className="object-contain p-4" />
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <div className="flex aspect-square items-center justify-center rounded-lg border border-line bg-sunken text-subtle">
-                Photo coming soon
-              </div>
-            )}
-          </div>
+          <ProductGallery media={p.media.map((m) => ({ kind: m.kind, url: m.url, alt: m.alt }))} name={p.name} />
 
           <div>
             {p.brand && <Eyebrow>{p.brand.name}</Eyebrow>}

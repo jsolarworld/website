@@ -172,7 +172,7 @@ model Product {
   createdAt          DateTime      @default(now())
   updatedAt          DateTime      @updatedAt
 
-  images      ProductImage[]
+  media       ProductMedia[]
   packageSpec PackageSpec?
   /// Components, when this product is a package.
   components  PackageItem[]  @relation("PackageComponents")
@@ -184,14 +184,22 @@ model Product {
   @@index([brandId])
 }
 
-model ProductImage {
-  id        String  @id @default(cuid())
+enum MediaKind {
+  IMAGE
+  VIDEO
+}
+
+/// A photo or a video clip of a product, in the order staff arranged them.
+model ProductMedia {
+  id        String    @id @default(cuid())
   productId String
-  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  product   Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  kind      MediaKind @default(IMAGE)
   /// Cloudinary URL.
   url       String
+  /// What it shows. Required: it is the alt text, and the caption under a video.
   alt       String
-  sortOrder Int     @default(0)
+  sortOrder Int       @default(0)
 
   @@index([productId])
 }

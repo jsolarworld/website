@@ -1,3 +1,4 @@
+import { MAX_MEDIA, isCloudinaryMedia, type MediaItem, type MediaKind } from "../media";
 import { slugify } from "../slug";
 
 /** What the admin product form submits, validated. Pure so it can be tested without a browser. */
@@ -30,7 +31,7 @@ export interface ProductInput {
   seoTitle: string | null;
   seoDescription: string | null;
   specs: Record<string, string | number>;
-  images: { url: string; alt: string }[];
+  media: MediaItem[];
   package: PackageInput | null;
 }
 
@@ -123,25 +124,26 @@ export function parseProductForm(form: FormLike, specTemplate: SpecField[]): Par
     } else specs[f.key] = raw;
   }
 
-  // Images arrive as JSON from the uploader: [{ url, alt }]. Every image needs alt text (PRD SEO-09).
-  const images: { url: string; alt: string }[] = [];
-  const imagesRaw = form.get("images");
-  if (typeof imagesRaw === "string" && imagesRaw.trim() !== "") {
+  // Photos and videos arrive as JSON from the uploader: [{ kind, url, alt }]. Every item needs a description (PRD SEO-09).
+  const media: MediaItem[] = [];
+  const mediaRaw = form.get("media");
+  if (typeof mediaRaw === "string" && mediaRaw.trim() !== "") {
     try {
-      const parsed: unknown = JSON.parse(imagesRaw);
-      if (!Array.isArray(parsed) || parsed.length > 12) throw new Error("bad");
+      const parsed: unknown = JSON.parse(mediaRaw);
+      if (!Array.isArray(parsed) || parsed.length > MAX_MEDIA) throw new Error("bad");
       for (const it of parsed) {
+        const kind: MediaKind = it?.kind === "VIDEO" ? "VIDEO" : "IMAGE";
         const url = typeof it?.url === "string" ? it.url : "";
         const alt = typeof it?.alt === "string" ? it.alt.trim().slice(0, 200) : "";
-        if (!/^https:\/\/res\.cloudinary\.com\/\S+$/.test(url)) throw new Error("bad");
+        if (!isCloudinaryMedia(kind, url)) throw new Error("bad");
         if (!alt) {
-          errors.images = "Every photo needs a short description (alt text)";
+          errors.media = "Every photo and video needs a short description";
           break;
         }
-        images.push({ url, alt });
+        media.push({ kind, url, alt });
       }
     } catch {
-      errors.images = "Photos could not be read. Remove them and upload again.";
+      errors.media = "Photos or videos could not be read. Remove them and upload again.";
     }
   }
 
@@ -213,7 +215,7 @@ export function parseProductForm(form: FormLike, specTemplate: SpecField[]): Par
       seoTitle: text("seoTitle", 70),
       seoDescription: text("seoDescription", 170),
       specs,
-      images,
+      media,
       package: pkg,
     },
   };

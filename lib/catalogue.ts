@@ -13,7 +13,8 @@ export type SortKey = keyof typeof SORTS;
 const cardInclude = {
   brand: true,
   category: true,
-  images: { orderBy: { sortOrder: "asc" }, take: 1 },
+  // A few, not one: the card falls back to a video's still frame and shows a second photo on hover.
+  media: { orderBy: { sortOrder: "asc" }, take: 4 },
 } satisfies Prisma.ProductInclude;
 
 export type ProductCardData = Prisma.ProductGetPayload<{ include: typeof cardInclude }>;
@@ -69,7 +70,7 @@ export const getProduct = (slug: string) =>
     include: {
       brand: true,
       category: true,
-      images: { orderBy: { sortOrder: "asc" } },
+      media: { orderBy: { sortOrder: "asc" } },
       packageSpec: true,
       components: { include: { component: true } },
     },

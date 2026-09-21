@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { IMAGE_FORMATS } from "./media";
 
 export interface CloudinaryConfig {
   cloudName: string;
@@ -22,7 +23,7 @@ export function signParams(params: Record<string, string | number>, apiSecret: s
 }
 
 export const UPLOAD_FOLDER = "j-solar-world/products";
-export const ALLOWED_FORMATS = "jpg,jpeg,png,webp";
+export const ALLOWED_FORMATS = IMAGE_FORMATS;
 
 export const PROOF_FOLDER = "j-solar-world/proofs";
 
