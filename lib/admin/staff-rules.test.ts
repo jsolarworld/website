@@ -1,6 +1,6 @@
 import { randomInt } from "node:crypto";
 import { describe, expect, it } from "vitest";
-import { makeTemporaryPassword, refuseAccessChange } from "./staff-rules";
+import { makeTemporaryPassword, needsTwoFactorSetup, refuseAccessChange } from "./staff-rules";
 
 const base = { actorId: "a", targetId: "b", targetRole: "STORE_MANAGER" as const, newRole: "SALES_REP" as const, ownerCount: 2 };
 
@@ -35,5 +35,14 @@ describe("makeTemporaryPassword", () => {
 
   it("differs between calls", () => {
     expect(makeTemporaryPassword(randomInt)).not.toBe(makeTemporaryPassword(randomInt));
+  });
+});
+
+describe("needsTwoFactorSetup", () => {
+  it("sends people to set up an authenticator only when it is required and missing", () => {
+    expect(needsTwoFactorSetup({ requireTwoFactor: true, twoFactorEnabled: false })).toBe(true);
+    expect(needsTwoFactorSetup({ requireTwoFactor: true, twoFactorEnabled: true })).toBe(false);
+    expect(needsTwoFactorSetup({ requireTwoFactor: false, twoFactorEnabled: false })).toBe(false);
+    expect(needsTwoFactorSetup({ requireTwoFactor: false, twoFactorEnabled: true })).toBe(false);
   });
 });

@@ -47,6 +47,18 @@ export async function resetStaffSignIn(userId: string, temporaryPassword: string
   ]);
 }
 
+/**
+ * Turn the authenticator requirement on or off for one person. Turning it off also removes their
+ * authenticator and signs them out, so the next sign-in is password-only; turning it on leaves them
+ * signed in and sends them to set one up on their next page.
+ */
+export async function setTwoFactorRequired(userId: string, required: boolean) {
+  await db.$transaction([
+    db.user.update({ where: { id: userId }, data: required ? { requireTwoFactor: true } : { requireTwoFactor: false, twoFactorEnabled: false } }),
+    ...(required ? [] : [db.twoFactor.deleteMany({ where: { userId } }), db.session.deleteMany({ where: { userId } })]),
+  ]);
+}
+
 /** Change a role, or take admin access away entirely (role becomes CUSTOMER). Always signs the person out. */
 export async function setStaffAccess(userId: string, role: StaffRole | "REMOVED") {
   await db.$transaction([

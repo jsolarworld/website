@@ -11,9 +11,14 @@ export default async function SecurityPage() {
   return (
     <Container className="max-w-xl py-12">
       <h1 className="text-display-3">Security</h1>
-      {!staff.twoFactorEnabled && (
+      {!staff.twoFactorEnabled && staff.requireTwoFactor && (
         <Notice tone="warning" title="Set up your authenticator app to continue" className="mt-6">
-          Staff accounts need a second sign-in step. Install Google Authenticator, Microsoft Authenticator or Authy on your phone first.
+          Your account needs a second sign-in step. Install Google Authenticator, Microsoft Authenticator or Authy on your phone first.
+        </Notice>
+      )}
+      {!staff.twoFactorEnabled && !staff.requireTwoFactor && (
+        <Notice tone="info" title="Two-step sign-in is optional for you" className="mt-6">
+          You can add an authenticator app for extra protection. An owner can also require it.
         </Notice>
       )}
       <div className="mt-8 space-y-8">

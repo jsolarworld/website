@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { logAudit } from "@/lib/admin/audit";
 import { requireStaff } from "@/lib/admin/guard";
 import { STAFF_ROLES, isStaffRole } from "@/lib/admin/permissions";
-import { createStaffUser, resetStaffSignIn, setStaffAccess } from "@/lib/admin/staff";
+import { createStaffUser, resetStaffSignIn, setStaffAccess, setTwoFactorRequired } from "@/lib/admin/staff";
 import { makeTemporaryPassword, refuseAccessChange } from "@/lib/admin/staff-rules";
 import { db } from "@/lib/db";
 
@@ -71,6 +71,21 @@ export async function manageStaff(_prev: StaffState, formData: FormData): Promis
     await logAudit({ actorId: actor.id, action: "staff.remove", entity: "User", entityId: target.id, before: { role: target.role }, after: { role: "CUSTOMER" } });
     revalidatePath("/admin/staff");
     return { message: `${target.name} no longer has admin access.` };
+  }
+
+  if (intent === "twofactor") {
+    // Same rule as access changes: never on yourself, so one person cannot quietly weaken their own account.
+    const refused = check(target.role as (typeof STAFF_ROLES)[number]);
+    if (refused) return { error: refused };
+    const required = formData.get("require") === "on";
+    await setTwoFactorRequired(target.id, required);
+    await logAudit({ actorId: actor.id, action: "staff.twofactor", entity: "User", entityId: target.id, after: { requireTwoFactor: required } });
+    revalidatePath("/admin/staff");
+    return {
+      message: required
+        ? `${target.name} must now set up an authenticator app. They will be asked on their next page.`
+        : `Two-step sign-in is off for ${target.name}. They have been signed out and can sign in with their password alone.`,
+    };
   }
 
   if (intent === "reset") {

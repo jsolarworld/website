@@ -54,6 +54,8 @@ export const auth = betterAuth({
       // input: false means a client can never set its own role.
       role: { type: "string", required: false, defaultValue: "CUSTOMER", input: false },
       phone: { type: "string", required: false },
+      // Read-only to clients; owners change it on the Staff page. Defaults to on.
+      requireTwoFactor: { type: "boolean", required: false, defaultValue: true, input: false },
     },
   },
   plugins: [twoFactor({ issuer: SITE.shortName }), nextCookies()],

@@ -18,6 +18,11 @@ export function refuseAccessChange(input: {
   return null;
 }
 
+/** Whether this person must be sent to set up an authenticator app before they can use the admin. */
+export function needsTwoFactorSetup(u: { requireTwoFactor: boolean; twoFactorEnabled: boolean }): boolean {
+  return u.requireTwoFactor && !u.twoFactorEnabled;
+}
+
 /** A readable temporary password: 12 characters, no look-alikes (0/O, 1/l/I). */
 export function makeTemporaryPassword(random: (max: number) => number): string {
   const alphabet = "abcdefghjkmnpqrstuvwxyzABCDEFGHJKMNPQRSTUVWXYZ23456789";

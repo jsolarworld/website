@@ -11,6 +11,7 @@ export interface StaffRow {
   email: string;
   role: StaffRole;
   twoFactorEnabled: boolean;
+  requireTwoFactor: boolean;
   isSelf: boolean;
   createdAt: string;
 }
@@ -93,7 +94,9 @@ export function StaffManager({ staff }: { staff: StaffRow[] }) {
                   <p className="text-sm text-muted">{s.email}</p>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Badge tone={s.twoFactorEnabled ? "positive" : "warning"}>{s.twoFactorEnabled ? "Two-step on" : "Two-step not set up"}</Badge>
+                  <Badge tone={s.twoFactorEnabled ? "positive" : s.requireTwoFactor ? "warning" : "neutral"}>
+                    {s.twoFactorEnabled ? "Two-step on" : s.requireTwoFactor ? "Two-step not set up yet" : "Two-step off"}
+                  </Badge>
                   <Badge tone="brand">{ROLE_LABEL[s.role]}</Badge>
                 </div>
               </div>
@@ -119,6 +122,19 @@ export function StaffManager({ staff }: { staff: StaffRow[] }) {
                     <input type="hidden" name="id" value={s.id} />
                     <Button type="submit" size="sm" variant="outline" disabled={working} title="New temporary password, and they set up their authenticator again">
                       Reset sign-in
+                    </Button>
+                  </form>
+                  <form
+                    action={rowAction}
+                    onSubmit={(e) => {
+                      if (s.requireTwoFactor && !confirm(`Turn off the authenticator requirement for ${s.name}? They will be signed out and will sign in with a password alone.`)) e.preventDefault();
+                    }}
+                  >
+                    <input type="hidden" name="intent" value="twofactor" />
+                    <input type="hidden" name="id" value={s.id} />
+                    {!s.requireTwoFactor && <input type="hidden" name="require" value="on" />}
+                    <Button type="submit" size="sm" variant="outline" disabled={working}>
+                      {s.requireTwoFactor ? "Turn two-step off" : "Require two-step"}
                     </Button>
                   </form>
                   <form action={rowAction} onSubmit={(e) => { if (!confirm(`Remove admin access for ${s.name}?`)) e.preventDefault(); }}>
