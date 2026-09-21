@@ -1,5 +1,6 @@
 "use client";
 
+import { keepValues } from "@/lib/keep-form";
 import { useActionState, useState } from "react";
 import { bulkPrices, type PriceState } from "@/app/admin/products/prices/actions";
 import { Button, Card, CardBody, Field, Input, Notice, Select } from "@/components/ui";
@@ -11,7 +12,7 @@ export function BulkPriceForm({ categories, brands }: { categories: { id: string
   const canApply = state.intent === "preview" && !state.fatal && (state.count ?? 0) > 0 && confirmed;
 
   return (
-    <form action={action} className="space-y-5">
+    <form action={action} onSubmit={keepValues(action)} className="space-y-5">
       <Card>
         <CardBody className="grid gap-5 sm:grid-cols-2">
           <Field name="categoryId" label="Category" required={false}>

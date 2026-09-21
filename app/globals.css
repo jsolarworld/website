@@ -152,6 +152,23 @@
       transform: translateX(100%);
     }
   }
+
+  /* Product gallery: a soft entrance for the next picture, and the bar that counts down to it. */
+  --animate-fade-in: fade-in 400ms ease-out;
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+    }
+  }
+  --animate-gallery-progress: gallery-progress 5s linear forwards;
+  @keyframes gallery-progress {
+    from {
+      transform: scaleX(0);
+    }
+    to {
+      transform: scaleX(1);
+    }
+  }
 }
 
 /* ============================================================================

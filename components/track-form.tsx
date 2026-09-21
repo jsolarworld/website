@@ -1,5 +1,6 @@
 "use client";
 
+import { keepValues } from "@/lib/keep-form";
 import { useActionState } from "react";
 import { trackOrder, type TrackState } from "@/app/order/actions";
 import { Button, Field, Input, Notice } from "@/components/ui";
@@ -7,7 +8,7 @@ import { Button, Field, Input, Notice } from "@/components/ui";
 export function TrackForm() {
   const [state, action, pending] = useActionState<TrackState, FormData>(trackOrder, {});
   return (
-    <form action={action} className="space-y-5">
+    <form action={action} onSubmit={keepValues(action)} className="space-y-5">
       {state.error && <Notice tone="danger">{state.error}</Notice>}
       <Field name="orderNumber" label="Order number" hint="Looks like JSW-K7M2QXA">
         {(f) => <Input {...f} autoCapitalize="characters" autoComplete="off" />}

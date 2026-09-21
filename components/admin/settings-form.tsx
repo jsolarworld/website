@@ -1,5 +1,6 @@
 "use client";
 
+import { keepValues } from "@/lib/keep-form";
 import { useActionState } from "react";
 import { saveSettings, type SettingsState } from "@/app/admin/settings/actions";
 import { Button, Card, CardBody, Field, Input, Notice } from "@/components/ui";
@@ -10,7 +11,7 @@ export function SettingsForm({ bank, orders }: { bank: BankDetails; orders: Orde
   const e = state.errors ?? {};
 
   return (
-    <form action={action} className="space-y-6">
+    <form action={action} onSubmit={keepValues(action)} className="space-y-6">
       {state.saved && <Notice tone="positive">Settings saved.</Notice>}
       {Object.keys(e).length > 0 && <Notice tone="danger" title="Please fix the highlighted fields" />}
 

@@ -1,5 +1,6 @@
 "use client";
 
+import { keepValues } from "@/lib/keep-form";
 import { useActionState, useState } from "react";
 import { saveProduct, type FormState } from "@/app/admin/products/actions";
 import { Button, Card, CardBody, Eyebrow, Field, Input, Notice, Select, Textarea } from "@/components/ui";
@@ -62,7 +63,7 @@ export function ProductForm({ initial, categories, brands, componentOptions, can
   const template = categories.find((c) => c.id === categoryId)?.specTemplate ?? [];
 
   return (
-    <form action={action} className="space-y-8">
+    <form action={action} onSubmit={keepValues(action)} className="space-y-8">
       <input type="hidden" name="id" value={initial.id} />
       <input type="hidden" name="kind" value={initial.kind} />
 

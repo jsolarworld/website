@@ -1,5 +1,6 @@
 "use client";
 
+import { keepValues } from "@/lib/keep-form";
 import { useActionState, useState } from "react";
 import { placeOrder, type CheckoutState } from "@/app/checkout/actions";
 import { Button, Card, CardBody, Eyebrow, Field, Input, Notice, Textarea } from "@/components/ui";
@@ -10,7 +11,7 @@ export function CheckoutForm({ paystackReady }: { paystackReady: boolean }) {
   const e = state.errors ?? {};
 
   return (
-    <form action={action} className="space-y-6">
+    <form action={action} onSubmit={keepValues(action)} className="space-y-6">
       {state.error && <Notice tone="danger">{state.error}</Notice>}
       {Object.keys(e).length > 0 && <Notice tone="danger" title="Please fix the highlighted fields" />}
 

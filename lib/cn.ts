@@ -18,7 +18,7 @@ const twMerge = extendTailwindMerge({
       // --shadow-*
       shadow: ["solar"],
       // --animate-*
-      animate: ["shimmer"],
+      animate: ["shimmer", "fade-in", "gallery-progress"],
       // Colours need no entry: tailwind-merge already treats an unrecognised
       // `text-*` / `bg-* `/ `border-*` value as a colour, which is right for
       // both the ramps (navy-600) and the semantic aliases (muted, chassis).
