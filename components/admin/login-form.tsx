@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Button, Field, Input, Notice } from "@/components/ui";
@@ -64,6 +65,9 @@ export function LoginForm() {
       <Button type="submit" variant="primary" block disabled={busy}>
         {busy ? "Signing in…" : "Sign in"}
       </Button>
+      <p className="text-center text-sm">
+        <Link href="/admin/forgot-password" className="text-muted underline">Forgot your password?</Link>
+      </p>
     </form>
   );
 }

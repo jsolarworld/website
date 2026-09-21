@@ -3,6 +3,7 @@ import { prismaAdapter } from "better-auth/adapters/prisma";
 import { nextCookies } from "better-auth/next-js";
 import { twoFactor } from "better-auth/plugins";
 import { db } from "./db";
+import { sendEmail } from "./email";
 import { SITE } from "./site";
 
 // Vercel sets VERCEL_PROJECT_PRODUCTION_URL to the production domain automatically (the custom domain
@@ -32,6 +33,21 @@ export const auth = betterAuth({
     enabled: true,
     disableSignUp: true,
     minPasswordLength: 10,
+    // A reset link works once, for an hour, and signs the person out everywhere. It does not touch their
+    // authenticator, so a stolen mailbox alone is still not enough to get into the admin.
+    resetPasswordTokenExpiresIn: 60 * 60,
+    revokeSessionsOnPasswordReset: true,
+    sendResetPassword: async ({ user, url }) => {
+      // Not awaited: the response must not reveal, by its timing, whether the address has an account.
+      void sendEmail({
+        to: user.email,
+        subject: `Reset your ${SITE.shortName} password`,
+        text:
+          `Hello ${user.name},\n\nSomeone asked to reset the password for your ${SITE.shortName} staff account. ` +
+          `Open this link within one hour to choose a new password:\n\n${url}\n\n` +
+          `If you did not ask for this, ignore this email; your password stays the same.`,
+      });
+    },
   },
   user: {
     additionalFields: {
