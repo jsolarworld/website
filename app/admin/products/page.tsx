@@ -1,7 +1,10 @@
 import Link from "next/link";
 import { Badge, Button, Container, EmptyState, Field, Input, Select, buttonClass } from "@/components/ui";
 import { requireStaff } from "@/lib/admin/guard";
+import { MISSING_FILTERS, isMissingFilter, missingDetails } from "@/lib/admin/missing";
+import { quoteGapIds } from "@/lib/admin/missing-service";
 import { can } from "@/lib/admin/permissions";
+import type { SpecField } from "@/lib/admin/product-form";
 import { effectivePrice, stockStatus } from "@/lib/catalogue";
 import { db } from "@/lib/db";
 import { formatNaira } from "@/lib/site";
@@ -12,14 +15,15 @@ export const metadata = { title: "Products" };
 const PAGE = 50;
 const STATUS_TONE = { PUBLISHED: "positive", DRAFT: "neutral", ARCHIVED: "warning" } as const;
 
-type Search = { q?: string; status?: string; category?: string; kind?: string; page?: string };
+type Search = { q?: string; status?: string; category?: string; kind?: string; missing?: string; page?: string };
 
 export default async function AdminProducts({ searchParams }: { searchParams: Promise<Search> }) {
   const staff = await requireStaff("catalogue:read");
   const sp = await searchParams;
   const page = Math.max(1, Number.parseInt(sp.page ?? "1", 10) || 1);
+  const missing = isMissingFilter(sp.missing) ? sp.missing : undefined;
 
-  const where: Prisma.ProductWhereInput = {
+  const filters: Prisma.ProductWhereInput = {
     ...(sp.status === "PUBLISHED" || sp.status === "DRAFT" || sp.status === "ARCHIVED" ? { status: sp.status } : {}),
     ...(sp.kind === "PACKAGE" || sp.kind === "PRODUCT" ? { kind: sp.kind } : {}),
     ...(sp.category ? { category: { slug: sp.category } } : {}),
@@ -33,11 +37,19 @@ export default async function AdminProducts({ searchParams }: { searchParams: Pr
         }
       : {}),
   };
+  const where: Prisma.ProductWhereInput =
+    missing === "price"
+      ? { AND: [filters, { priceNgn: null }] }
+      : missing === "photo"
+        ? { AND: [filters, { media: { none: {} } }] }
+        : missing === "quote"
+          ? { AND: [filters, { id: { in: await quoteGapIds(filters) } }] }
+          : filters;
 
   const [items, total, categories] = await Promise.all([
     db.product.findMany({
       where,
-      include: { category: true, brand: true, packageSpec: { select: { approved: true } } },
+      include: { category: true, brand: true, packageSpec: { select: { approved: true } }, _count: { select: { media: true } } },
       orderBy: { updatedAt: "desc" },
       skip: (page - 1) * PAGE,
       take: PAGE,
@@ -65,7 +77,7 @@ export default async function AdminProducts({ searchParams }: { searchParams: Pr
         )}
       </div>
 
-      <form method="get" className="mt-6 grid gap-3 rounded-lg border border-line bg-surface p-4 sm:grid-cols-2 lg:grid-cols-[2fr_1fr_1fr_1fr_auto] lg:items-end">
+      <form method="get" className="mt-6 grid gap-3 rounded-lg border border-line bg-surface p-4 sm:grid-cols-2 lg:grid-cols-[2fr_1fr_1fr_1fr_1fr_auto] lg:items-end">
         <Field name="q" label="Search" required={false}>
           {(f) => <Input {...f} type="search" defaultValue={sp.q} placeholder="Name, SKU or brand" />}
         </Field>
@@ -100,12 +112,27 @@ export default async function AdminProducts({ searchParams }: { searchParams: Pr
             </Select>
           )}
         </Field>
+        <Field name="missing" label="Missing" required={false}>
+          {(f) => (
+            <Select {...f} defaultValue={missing ?? ""}>
+              <option value="">Show all products</option>
+              {Object.entries(MISSING_FILTERS).map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </Select>
+          )}
+        </Field>
         <Button type="submit" variant="chassis">
           Filter
         </Button>
       </form>
 
-      <p className="mt-6 text-sm text-muted">{total} found</p>
+      <p className="mt-6 text-sm text-muted">
+        {total} found
+        {missing === "quote" && ". The quote tool can only offer these once what is listed under each name is filled in (a photo is not needed)."}
+      </p>
 
       {items.length === 0 ? (
         <EmptyState
@@ -141,6 +168,12 @@ export default async function AdminProducts({ searchParams }: { searchParams: Pr
               {items.map((p) => {
                 const st = stockStatus(p);
                 const price = effectivePrice(p);
+                const gaps = missingDetails({
+                  ...p,
+                  mediaCount: p._count.media,
+                  categorySlug: p.category.slug,
+                  specTemplate: (p.category.specTemplate ?? []) as unknown as SpecField[],
+                });
                 return (
                   <tr key={p.id} className="hover:bg-sunken">
                     <td className="px-4 py-3">
@@ -155,6 +188,7 @@ export default async function AdminProducts({ searchParams }: { searchParams: Pr
                           </Badge>
                         )}
                       </p>
+                      {gaps.length > 0 && <p className="mt-1 text-xs text-ember-700">Missing: {gaps.join(" · ")}</p>}
                     </td>
                     <td className="px-4 py-3 text-muted">{p.category.name}</td>
                     <td className="numeric px-4 py-3 text-right">{price != null ? formatNaira(price) : <span className="text-muted">Not set</span>}</td>

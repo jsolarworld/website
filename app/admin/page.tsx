@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Card, CardBody, Container, Eyebrow, Notice, SpecFigure, buttonClass } from "@/components/ui";
 import { requireStaff } from "@/lib/admin/guard";
+import { quoteGapIds } from "@/lib/admin/missing-service";
 import { can } from "@/lib/admin/permissions";
 import { db } from "@/lib/db";
 
@@ -9,8 +10,9 @@ export const metadata = { title: "Dashboard" };
 export default async function AdminHome({ searchParams }: { searchParams: Promise<{ denied?: string }> }) {
   const staff = await requireStaff();
   const { denied } = await searchParams;
+  const catalogue = can(staff.role, "catalogue:read");
 
-  const [published, drafts, lowStock, newLeads, packages, unapproved] = await Promise.all([
+  const [published, drafts, lowStock, newLeads, packages, unapproved, gaps] = await Promise.all([
     db.product.count({ where: { status: "PUBLISHED" } }),
     db.product.count({ where: { status: "DRAFT" } }),
     // Prisma cannot compare two columns, so filter a bounded list in memory.
@@ -20,7 +22,20 @@ export default async function AdminHome({ searchParams }: { searchParams: Promis
     can(staff.role, "leads:read") ? db.lead.count({ where: { status: "NEW" } }) : Promise.resolve(null),
     db.product.count({ where: { kind: "PACKAGE", status: "PUBLISHED" } }),
     db.packageSpec.count({ where: { approved: false } }),
+    // The same counts as the product list's "Missing" filter, so each card leads to exactly that list.
+    catalogue
+      ? Promise.all([
+          db.product.count({ where: { priceNgn: null } }),
+          db.product.count({ where: { media: { none: {} } } }),
+          quoteGapIds().then((ids) => ids.length),
+        ]).then(([price, photo, quote]) => [
+          { key: "price", count: price, label: "No price yet", note: "Shown as “Price on request”" },
+          { key: "photo", count: photo, label: "No photo or video", note: "Shown with a drawn picture" },
+          { key: "quote", count: quote, label: "Missing quote tool details", note: "Price, brand or ratings" },
+        ])
+      : Promise.resolve([]),
   ]);
+  const toFinish = gaps.filter((g) => g.count > 0);
 
   return (
     <Container className="py-10">
@@ -55,6 +70,26 @@ export default async function AdminHome({ searchParams }: { searchParams: Promis
           </Card>
         )}
       </div>
+
+      {toFinish.length > 0 && (
+        <div className="mt-10">
+          <Eyebrow>Products to finish</Eyebrow>
+          <ul className="mt-3 grid gap-4 sm:grid-cols-3">
+            {toFinish.map((g) => (
+              <li key={g.key}>
+                <Card interactive className="h-full">
+                  <CardBody>
+                    <SpecFigure label={g.label} value={g.count} note={g.note} />
+                    <Link href={`/admin/products?missing=${g.key}`} className="mt-3 inline-block text-sm text-navy-600 underline underline-offset-4 after:absolute after:inset-0">
+                      Show them
+                    </Link>
+                  </CardBody>
+                </Card>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       <div className="mt-10">
         <Eyebrow>Quick actions</Eyebrow>

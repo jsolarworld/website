@@ -417,26 +417,29 @@ export const CHAT_PRODUCTS: ChatProduct[] = [
     media: [{ file: "IMG-20261002-WA0066.jpg", alt: "Taico 10kWh lithium battery, front view" }],
   },
 
-  // ─── All-in-one systems (inverter and battery together) ─────────────────────
+  // ─── Inverter and battery sets (all-in-one units and matched sets) ──────────
   {
     name: "Felicity All-in-One 8kVA Inverter with 10kWh Lithium Battery",
-    category: "solar-packages",
+    category: "inverter-and-battery-sets",
     brand: "Felicity",
     priceNgn: 2_500_000,
+    specs: { ratedKva: 8, batteryKwh: 10 },
     media: [{ file: "IMG-20260921-WA0100.jpg", alt: "Felicity all-in-one system: 8kVA inverter stacked on a 10kWh lithium battery", crop: [0, 0, 730, 973] }],
   },
   {
     name: "Cworth All-in-One 10kVA Inverter with 16kWh Lithium Battery",
-    category: "solar-packages",
+    category: "inverter-and-battery-sets",
     brand: "Cworth",
     priceNgn: 3_000_000,
+    specs: { ratedKva: 10, batteryKwh: 16 },
     media: [{ file: "VID-20261002-WA0019.mp4", alt: "Video of the Cworth Energy all-in-one system: 10kVA inverter with a 16kWh lithium battery" }],
   },
   {
     name: "Felicity 30kVA Inverter with 60kWh Lithium Battery",
-    category: "solar-packages",
+    category: "inverter-and-battery-sets",
     brand: "Felicity",
     priceNgn: 19_000_000,
+    specs: { ratedKva: 30, batteryKwh: 60 },
     media: [{ file: "IMG-20261002-WA0016.jpg", alt: "Felicity 30kVA inverter beside a 60kWh lithium battery rack" }],
   },
 

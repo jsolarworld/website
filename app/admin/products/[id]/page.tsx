@@ -107,7 +107,7 @@ export default async function EditProductPage({ params, searchParams }: Props) {
         {canWrite ? (
           <ProductForm
             initial={initial}
-            categories={categories.map((c) => ({ id: c.id, name: c.name, specTemplate: (c.specTemplate ?? []) as unknown as SpecField[] }))}
+            categories={categories.map((c) => ({ id: c.id, slug: c.slug, name: c.name, specTemplate: (c.specTemplate ?? []) as unknown as SpecField[] }))}
             brands={brands.map((b) => ({ id: b.id, name: b.name }))}
             componentOptions={componentOptions}
             canApprove={can(staff.role, "packages:approve")}

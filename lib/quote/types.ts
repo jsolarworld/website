@@ -9,7 +9,7 @@ export interface Appliance {
   dutyCycle: number;
   /** Start-up draw multiplier for motor loads. */
   surge: number;
-  /** Heavy heating loads that should usually stay off battery backup. */
+  /** Heavy loads (heaters, big pumps) that should usually stay off battery backup. */
   highDraw: boolean;
 }
 

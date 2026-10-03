@@ -6,6 +6,7 @@ import { saveProduct, type FormState } from "@/app/admin/products/actions";
 import { Button, Card, CardBody, Eyebrow, Field, Input, Notice, Select, Textarea } from "@/components/ui";
 import { ComponentsField, type ComponentOption, type ComponentRow } from "./components-field";
 import { MediaField, type MediaItem } from "./media-field";
+import { brandNeeded, quoteSpecKeys } from "@/lib/admin/missing";
 import { NEW_BRAND, type SpecField } from "@/lib/admin/product-form";
 
 export interface ProductFormInitial {
@@ -45,12 +46,14 @@ export interface ProductFormInitial {
 
 interface Props {
   initial: ProductFormInitial;
-  categories: { id: string; name: string; specTemplate: SpecField[] }[];
+  categories: { id: string; slug: string; name: string; specTemplate: SpecField[] }[];
   brands: { id: string; name: string }[];
   componentOptions: ComponentOption[];
   canApprove: boolean;
   isEdit: boolean;
 }
+
+const QUOTE_HINT = "Needed by the quote tool";
 
 export function ProductForm({ initial, categories, brands, componentOptions, canApprove, isEdit }: Props) {
   const [state, action, pending] = useActionState<FormState, FormData>(saveProduct, {});
@@ -60,7 +63,10 @@ export function ProductForm({ initial, categories, brands, componentOptions, can
   const [newBrand, setNewBrand] = useState("");
   const e = state.errors ?? {};
   const isPackage = initial.kind === "PACKAGE";
-  const template = categories.find((c) => c.id === categoryId)?.specTemplate ?? [];
+  const category = categories.find((c) => c.id === categoryId);
+  const template = category?.specTemplate ?? [];
+  // Packages carry their own sizing below; for single products, point out what the quote tool reads.
+  const quoteKeys = isPackage ? [] : quoteSpecKeys(category?.slug ?? "");
 
   return (
     <form action={action} onSubmit={keepValues(action)} className="space-y-8">
@@ -88,7 +94,7 @@ export function ProductForm({ initial, categories, brands, componentOptions, can
             )}
           </Field>
           <div className="space-y-3">
-            <Field name="brandId" label="Brand" required={false} error={e.brandId}>
+            <Field name="brandId" label="Brand" required={false} error={e.brandId} hint={!isPackage && brandNeeded(category?.slug ?? "") ? QUOTE_HINT : undefined}>
               {(f) => (
                 <Select {...f} value={brandChoice} onChange={(ev) => setBrandChoice(ev.target.value)}>
                   <option value="">No brand</option>
@@ -146,12 +152,19 @@ export function ProductForm({ initial, categories, brands, componentOptions, can
             <Eyebrow>Specifications</Eyebrow>
             <div className="mt-4 grid gap-5 sm:grid-cols-2">
               {template.map((f) => (
-                <Field key={`${categoryId}-${f.key}`} name={`spec.${f.key}`} label={f.unit ? `${f.label} (${f.unit})` : f.label} required={false} error={e[`spec.${f.key}`]}>
+                <Field
+                  key={`${categoryId}-${f.key}`}
+                  name={`spec.${f.key}`}
+                  label={f.unit ? `${f.label} (${f.unit})` : f.label}
+                  required={false}
+                  error={e[`spec.${f.key}`]}
+                  hint={quoteKeys.includes(f.key) ? QUOTE_HINT : undefined}
+                >
                   {(p) => <Input {...p} inputMode={f.unit ? "decimal" : "text"} defaultValue={String(initial.specs[f.key] ?? "")} />}
                 </Field>
               ))}
             </div>
-            {categories.find((c) => c.id === categoryId)?.name.toLowerCase().includes("inverter") && (
+            {category?.name.toLowerCase().includes("inverter") && (
               <p className="mt-3 text-sm text-muted">
                 &quot;Rated continuous power&quot; is the true output in watts, printed on the inverter label. It is not the same as the kVA number in the name.
               </p>

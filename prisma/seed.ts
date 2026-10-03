@@ -28,6 +28,19 @@ const CATEGORIES: { slug: string; name: string; specTemplate: Spec[] }[] = [
     ],
   },
   {
+    // An inverter sold with its battery: one stacked all-in-one unit or a matched set. The quote tool needs both halves' ratings.
+    slug: "inverter-and-battery-sets",
+    name: "Inverter and Battery Sets",
+    specTemplate: [
+      num("ratedKva", "Inverter rating", "kVA"),
+      num("ratedContinuousW", "Rated continuous power", "W"),
+      num("surgeW", "Surge power", "W", false),
+      num("batteryKwh", "Battery capacity", "kWh"),
+      num("systemVoltage", "Battery voltage", "V"),
+      text("type", "Type", true),
+    ],
+  },
+  {
     slug: "lithium-batteries",
     name: "Lithium Batteries",
     specTemplate: [

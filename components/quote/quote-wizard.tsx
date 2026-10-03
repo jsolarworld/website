@@ -37,7 +37,7 @@ export interface ApplianceOption {
 interface Row {
   qty: number;
   hours: number;
-  /** Heavy heating loads start off battery backup; the customer can switch them on. */
+  /** Heavy loads (heaters, big pumps) start off battery backup; the customer can switch them on. */
   onBackup: boolean;
 }
 
