@@ -13,7 +13,8 @@
     "db:studio": "prisma studio",
     "db:seed": "prisma db seed",
     "admin:create": "tsx --conditions=react-server scripts/create-staff.ts",
-    "admin:reset": "tsx --conditions=react-server scripts/reset-staff.ts"
+    "admin:reset": "tsx --conditions=react-server scripts/reset-staff.ts",
+    "import:chat": "tsx scripts/import-chat-products.ts"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.10.0",

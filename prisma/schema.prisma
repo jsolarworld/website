@@ -156,7 +156,8 @@ model Product {
   category           Category      @relation(fields: [categoryId], references: [id])
   brandId            String?
   brand              Brand?        @relation(fields: [brandId], references: [id])
-  priceNgn           Int
+  /// Empty when the price is not published yet: the site shows "Price on request" and the product cannot be bought online.
+  priceNgn           Int?
   salePriceNgn       Int?
   stock              Int           @default(0)
   lowStockThreshold  Int           @default(2)

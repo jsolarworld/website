@@ -1,7 +1,7 @@
 import "server-only";
 import { randomInt } from "node:crypto";
 import type { Prisma } from "../../generated/prisma/client";
-import { effectivePrice } from "../catalogue";
+import { canBuyOnline, effectivePrice } from "../catalogue";
 import { db } from "../db";
 import { coverOf } from "../media";
 import { getOrderSettings } from "../settings";
@@ -30,7 +30,7 @@ export interface CartView {
   ok: boolean;
 }
 
-/** The cart with live prices and stock. Lines whose product is gone or unpublished are dropped. */
+/** The cart with live prices and stock. Lines whose product is gone, unpublished or no longer priced are dropped. */
 export async function loadCart(lines: CartLine[]): Promise<CartView> {
   if (lines.length === 0) return { lines: [], subtotalNgn: 0, ok: false };
   const products = await db.product.findMany({
@@ -41,16 +41,17 @@ export async function loadCart(lines: CartLine[]): Promise<CartView> {
   const view: CartView["lines"] = [];
   for (const l of lines) {
     const p = byId.get(l.productId);
-    if (!p) continue;
+    const unitPriceNgn = p ? effectivePrice(p) : null;
+    if (!p || unitPriceNgn == null) continue;
     const cover = coverOf(p.media);
     view.push({
       productId: p.id,
       quantity: l.quantity,
       name: p.name,
       slug: p.slug,
-      unitPriceNgn: effectivePrice(p),
+      unitPriceNgn,
       stock: p.stock,
-      available: !p.availableOnRequest && p.stock >= l.quantity,
+      available: canBuyOnline(p, l.quantity),
       imageUrl: cover?.url ?? null,
       imageAlt: cover?.alt ?? p.name,
     });
@@ -78,7 +79,9 @@ export async function createOrder(lines: CartLine[], input: CheckoutInput) {
         if (!p) throw new OrderError("An item in your cart is no longer available. Please review your cart.");
         if (p.availableOnRequest) throw new OrderError(`${p.name} is available on request. Please message us to order it.`);
         if (p.stock < l.quantity) throw new OrderError(p.stock > 0 ? `Only ${p.stock} of ${p.name} left.` : `${p.name} is out of stock.`);
-        priced.push({ productId: p.id, name: p.name, unitPriceNgn: effectivePrice(p), quantity: l.quantity });
+        const unitPriceNgn = effectivePrice(p);
+        if (unitPriceNgn == null) throw new OrderError(`${p.name} has no price online right now. Please message us to order it.`);
+        priced.push({ productId: p.id, name: p.name, unitPriceNgn, quantity: l.quantity });
       }
 
       for (const item of priced) {

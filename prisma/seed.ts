@@ -77,10 +77,11 @@ const CATEGORIES: { slug: string; name: string; specTemplate: Spec[] }[] = [
   { slug: "cables-and-components", name: "Cables and System Components", specTemplate: [text("type", "Type", true)] },
 ];
 
-// Brands the owner says he carries (inverters and lithium batteries). Panel brands are still open.
+// Brands the owner says he carries (inverters and lithium batteries), spelled as printed on the products.
+// Brands that arrive with products (panels, street lights) are created by the product form or the chat import.
 const BRANDS = [
-  "Felicity", "Deye", "Sako", "Africell", "SMS", "LVSTUPSUN", "Yohako",
-  "Blue Power", "Blue Carbon", "Ecolione", "Cworth",
+  "Felicity", "Deye", "Sako", "Africell", "SMS", "LVTOPSUN", "Yohako",
+  "Blue Power", "Blue Carbon", "Ecolion", "Cworth",
 ];
 
 const slugify = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");

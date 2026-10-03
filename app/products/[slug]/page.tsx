@@ -4,7 +4,7 @@ import { notFound, permanentRedirect } from "next/navigation";
 import { Badge, Button, Card, CardBody, Container, Eyebrow, Input, Notice, Price, Section, SpecList, buttonClass } from "@/components/ui";
 import { addToCart } from "@/app/cart/actions";
 import { ProductGallery } from "@/components/product-gallery";
-import { effectivePrice, getProduct, stockStatus } from "@/lib/catalogue";
+import { canBuyOnline, effectivePrice, getProduct, stockStatus } from "@/lib/catalogue";
 import { db } from "@/lib/db";
 import { coverOf } from "@/lib/media";
 import { SITE, formatNaira, jsonLd, whatsappLink } from "@/lib/site";
@@ -31,11 +31,12 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const p = await getProduct((await params).slug);
   if (!p) return {};
   const image = coverOf(p.media)?.url;
+  const price = effectivePrice(p);
   return {
     title: p.seoTitle ?? p.name,
     description:
       p.seoDescription ??
-      `${p.name} at ${formatNaira(effectivePrice(p))}. ${p.warranty ? `${p.warranty}. ` : ""}Sold and installed by J Solar World, Alaba International Market, Lagos.`,
+      `${p.name}${price != null ? ` at ${formatNaira(price)}` : ""}. ${p.warranty ? `${p.warranty}. ` : ""}Sold and installed by J Solar World, Alaba International Market, Lagos.`,
     alternates: { canonical: `/products/${p.slug}` },
     openGraph: { type: "website", title: p.name, images: image ? [image] : undefined },
   };
@@ -52,8 +53,9 @@ export default async function ProductPage({ params }: Props) {
   }
 
   const status = stockStatus(p);
+  // No price set yet: the page says "Price on request" and sends the customer to WhatsApp.
   const price = effectivePrice(p);
-  const onSale = p.salePriceNgn != null && p.salePriceNgn < p.priceNgn;
+  const was = price != null && p.priceNgn != null && price < p.priceNgn ? p.priceNgn : null;
   const specs = (p.specs ?? {}) as Record<string, string | number>;
   const template = (p.category.specTemplate ?? []) as unknown as SpecField[];
   const specRows = template
@@ -63,26 +65,32 @@ export default async function ProductPage({ params }: Props) {
   if (p.sku) specRows.push({ label: "SKU", value: p.sku });
 
   const url = `${SITE.url}/products/${p.slug}`;
-  // Only in-stock items that are not "on request" can go in the cart.
-  const purchasable = !p.availableOnRequest && p.stock > 0;
+  const purchasable = canBuyOnline(p);
+  const photos = p.media.filter((m) => m.kind === "IMAGE").map((m) => m.url);
   const structured = [
-    {
-      "@context": "https://schema.org",
-      "@type": "Product",
-      name: p.name,
-      description: p.description ?? undefined,
-      sku: p.sku ?? undefined,
-      brand: p.brand ? { "@type": "Brand", name: p.brand.name } : undefined,
-      image: p.media.filter((m) => m.kind === "IMAGE").map((m) => m.url),
-      offers: {
-        "@type": "Offer",
-        url,
-        priceCurrency: "NGN",
-        price: price,
-        availability: AVAILABILITY[status.key],
-        seller: { "@type": "Organization", name: SITE.name },
-      },
-    },
+    // Google treats a Product without an offer (and an offer without a price) as an error, so a
+    // "price on request" product gets only the breadcrumb.
+    ...(price != null
+      ? [
+          {
+            "@context": "https://schema.org",
+            "@type": "Product",
+            name: p.name,
+            description: p.description ?? undefined,
+            sku: p.sku ?? undefined,
+            brand: p.brand ? { "@type": "Brand", name: p.brand.name } : undefined,
+            image: photos.length > 0 ? photos : undefined,
+            offers: {
+              "@type": "Offer",
+              url,
+              priceCurrency: "NGN",
+              price,
+              availability: AVAILABILITY[status.key],
+              seller: { "@type": "Organization", name: SITE.name },
+            },
+          },
+        ]
+      : []),
     {
       "@context": "https://schema.org",
       "@type": "BreadcrumbList",
@@ -114,11 +122,13 @@ export default async function ProductPage({ params }: Props) {
             <h1 className="mt-2 text-display-3">{p.name}</h1>
 
             <div className="mt-5 flex flex-wrap items-center gap-3">
-              <Price amount={price} was={onSale ? p.priceNgn : null} size="xl" />
+              {price != null ? <Price amount={price} was={was} size="xl" /> : <p className="font-display text-display-3 text-strong">Price on request</p>}
               <Badge tone={TONE[status.key]} dot>{status.label}</Badge>
             </div>
             <p className="mt-2 text-sm text-muted">
-              Price in naira, no VAT added. It is locked once your payment is confirmed.
+              {price != null
+                ? "Price in naira, no VAT added. It is locked once your payment is confirmed."
+                : "Message us and we will send you today's price. No VAT is added."}
             </p>
 
             {purchasable ? (
@@ -151,11 +161,13 @@ export default async function ProductPage({ params }: Props) {
               <div className="mt-6 flex flex-wrap gap-3">
                 <a
                   className={buttonClass({ variant: "primary", size: "lg" })}
-                  href={whatsappLink(`Hello ${SITE.shortName}, I want to order: ${p.name} (${url})`)}
+                  href={whatsappLink(
+                    price == null ? `Hello ${SITE.shortName}, please what is the price of: ${p.name} (${url})` : `Hello ${SITE.shortName}, I want to order: ${p.name} (${url})`,
+                  )}
                   target="_blank"
                   rel="noopener noreferrer"
                 >
-                  {status.key === "out" ? "Ask when it's back" : "Order on WhatsApp"}
+                  {status.key === "out" ? "Ask when it's back" : price == null ? "Ask the price on WhatsApp" : "Order on WhatsApp"}
                 </a>
                 <Link href="/solar-quote" className={buttonClass({ variant: "outline", size: "lg" })}>
                   Not sure it fits? Get a quote

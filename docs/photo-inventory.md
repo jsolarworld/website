@@ -1,5 +1,10 @@
 # Product photo inventory (from the WhatsApp export)
 
+> **Update, 3 October 2026.** This page describes the first export (18 September): uncaptioned warehouse shots.
+> On 21 September and 2 October the owner sent proper product photos with names and prices. Those are now
+> products on the site; the list is `scripts/chat-products.ts` and `pnpm import:chat` loads it. The warehouse
+> shots below are still unused, apart from the LVTOPSUN G3 carton video.
+
 Source: `chat/` (gitignored). 141 JPG photos and 120 MP4 videos survived the export; 89 more "media omitted" messages
 were not exported, so more photos exist on the owner's phone. Only 6 files carry a caption.
 Identified from thumbnails and visible labels on 2026-09-20: **verify each before using it on a product page.**

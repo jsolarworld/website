@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import { cookies } from "next/headers";
+import { ProductPlaceholder } from "@/components/product-placeholder";
 import { Badge, Button, Container, EmptyState, Input, Notice, Panel, Price, Section, SectionHeader, buttonClass } from "@/components/ui";
 import { CART_COOKIE, parseCart } from "@/lib/orders/cart";
 import { expireStaleOrders, loadCart } from "@/lib/orders/service";
@@ -41,7 +42,7 @@ export default async function CartPage() {
               {cart.lines.map((l) => (
                 <li key={l.productId} className="flex flex-wrap items-center gap-4 p-4">
                   <div className="relative size-20 shrink-0 overflow-hidden rounded bg-sunken">
-                    {l.imageUrl ? <Image src={l.imageUrl} alt={l.imageAlt} fill sizes="80px" className="object-contain p-1" /> : null}
+                    {l.imageUrl ? <Image src={l.imageUrl} alt={l.imageAlt} fill sizes="80px" className="object-contain p-1" /> : <ProductPlaceholder seed={l.name} label={null} />}
                   </div>
                   <div className="min-w-[10rem] flex-1">
                     <Link href={`/products/${l.slug}`} className="font-medium text-strong hover:underline">

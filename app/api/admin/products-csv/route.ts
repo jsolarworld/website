@@ -32,7 +32,7 @@ export async function GET(req: NextRequest) {
         p.name,
         p.category.name,
         p.brand?.name ?? "",
-        p.priceNgn,
+        p.priceNgn ?? "",
         p.salePriceNgn ?? "",
         p.stock,
         p.status.toLowerCase(),

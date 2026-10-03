@@ -29,7 +29,7 @@ export default async function ImportPage() {
       <Notice className="mt-6" title="How it works">
         <ul className="list-disc space-y-1 pl-5">
           <li>
-            <strong>sku</strong> is the key. A SKU that already exists is updated; a new SKU is added (it needs name, category and price).
+            <strong>sku</strong> is the key. A SKU that already exists is updated; a new SKU is added (it needs a name and a category; leave the price empty to show &quot;Price on request&quot;).
           </li>
           <li>On updates, an empty cell leaves the value as it is. Nothing is ever deleted.</li>
           <li>

@@ -24,12 +24,51 @@ import {
   Textarea,
   buttonClass,
 } from "@/components/ui";
+import { ProductCard } from "@/components/product-card";
+import type { ProductCardData } from "@/lib/catalogue";
 import { SITE } from "@/lib/site";
 
 export const metadata: Metadata = {
   title: "Design system",
   robots: { index: false, follow: false },
 };
+
+/* Stand-ins for catalogue rows, so the tile's states can be seen without touching the database. */
+const sampleProduct = (o: { name: string; brand: string; priceNgn: number | null; salePriceNgn?: number; stock?: number; onRequest?: boolean }): ProductCardData => ({
+  id: `sample-${o.name}`,
+  kind: "PRODUCT",
+  slug: "sample",
+  sku: null,
+  name: o.name,
+  description: null,
+  categoryId: "sample",
+  brandId: "sample",
+  priceNgn: o.priceNgn,
+  salePriceNgn: o.salePriceNgn ?? null,
+  stock: o.stock ?? 0,
+  lowStockThreshold: 2,
+  availableOnRequest: o.onRequest ?? false,
+  specs: {},
+  warranty: null,
+  datasheetUrl: null,
+  weightKg: null,
+  status: "PUBLISHED",
+  featured: false,
+  seoTitle: null,
+  seoDescription: null,
+  createdAt: new Date(0),
+  updatedAt: new Date(0),
+  brand: { id: "sample", slug: "sample", name: o.brand },
+  category: { id: "sample", slug: "sample", name: "Lithium Batteries", intro: null, specTemplate: [], sortOrder: 0 },
+  media: [],
+});
+
+const sampleProducts = [
+  sampleProduct({ name: "Felicity FLA 5kWh Lithium Battery 48V", brand: "Felicity", priceNgn: 1_050_000, stock: 4 }),
+  sampleProduct({ name: "Cworth 12V 100Ah Lithium Battery", brand: "Cworth", priceNgn: 240_000, salePriceNgn: 215_000, onRequest: true }),
+  sampleProduct({ name: "LVTOPSUN 32kWh Lithium Battery 51.2V", brand: "LVTOPSUN", priceNgn: null, onRequest: true }),
+  sampleProduct({ name: "Sako 5kVA Inverter 48V", brand: "Sako", priceNgn: 480_000 }),
+];
 
 /* Class names are written out in full: Tailwind scans source text, so a
    template-literal class like `bg-${x}` would never be generated. */
@@ -482,6 +521,25 @@ export default function DesignSystemPage() {
               </CardBody>
             </Card>
           </div>
+        </Container>
+      </Section>
+
+      {/* ---------------------------------------------------------------- */}
+      <Section tone="page">
+        <Container>
+          <SectionHeader
+            eyebrow="Components"
+            title="Product tiles"
+            lead="The real catalogue tile in its four states. A product with no photo yet gets a drawn placeholder — solar cells under a corner sun, varied by the product's name — and one with no price says so and sends the customer to WhatsApp."
+          />
+
+          <ul className="mt-12 grid grid-cols-2 gap-4 lg:grid-cols-4">
+            {sampleProducts.map((p) => (
+              <li key={p.id}>
+                <ProductCard product={p} />
+              </li>
+            ))}
+          </ul>
         </Container>
       </Section>
 

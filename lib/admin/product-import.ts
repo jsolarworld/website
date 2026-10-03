@@ -7,14 +7,14 @@ import type { SpecField } from "./product-form";
  * lookups and gets back exactly what would be created or updated, plus row-level errors.
  *
  * Rules: SKU is the key. A SKU that exists is UPDATED (blank cells leave a value unchanged); a new SKU is
- * CREATED and needs name, category and price. Nothing is deleted.
+ * CREATED and needs a name and a category (a blank price means "Price on request"). Nothing is deleted.
  */
 
 export interface ImportContext {
   categories: { id: string; slug: string; name: string; specTemplate: SpecField[] }[];
   brands: { id: string; slug: string; name: string }[];
   /** Existing products by SKU. */
-  existing: Map<string, { id: string; slug: string; priceNgn: number; salePriceNgn: number | null; stock: number; status: string; categoryId: string }>;
+  existing: Map<string, { id: string; slug: string; priceNgn: number | null; salePriceNgn: number | null; stock: number; status: string; categoryId: string }>;
   takenSlugs: Set<string>;
 }
 
@@ -124,7 +124,10 @@ export function planImport(csv: string, ctx: ImportContext): ImportReport {
       else fields.salePriceNgn = n;
     }
     const finalPrice = fields.priceNgn ?? existing?.priceNgn;
-    if (fields.salePriceNgn != null && finalPrice != null && fields.salePriceNgn >= finalPrice) err("sale_price must be lower than price");
+    if (fields.salePriceNgn != null && !bad) {
+      if (finalPrice == null) err("sale_price needs a price");
+      else if (fields.salePriceNgn >= finalPrice) err("sale_price must be lower than price");
+    }
 
     if (r.stock) {
       const n = num(r.stock);
@@ -164,7 +167,6 @@ export function planImport(csv: string, ctx: ImportContext): ImportReport {
     if (!existing) {
       if (!fields.name) err("new products need a name");
       if (!fields.categoryId && !r.category) err("new products need a category");
-      if (fields.priceNgn == null && !r.price) err("new products need a price");
     }
     if (bad) return;
 

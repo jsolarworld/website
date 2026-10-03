@@ -1,8 +1,9 @@
 import Image from "next/image";
 import Link from "next/link";
 import { addToCart } from "@/app/cart/actions";
+import { ProductPlaceholder } from "@/components/product-placeholder";
 import { Badge, Button, Price, buttonClass } from "@/components/ui";
-import { effectivePrice, stockStatus, type ProductCardData } from "@/lib/catalogue";
+import { canBuyOnline, effectivePrice, stockStatus, type ProductCardData } from "@/lib/catalogue";
 import { coverOf } from "@/lib/media";
 
 const SIZES = "(min-width: 1024px) 25vw, (min-width: 640px) 33vw, 50vw";
@@ -11,6 +12,7 @@ const SIZES = "(min-width: 1024px) 25vw, (min-width: 640px) 33vw, 50vw";
  * Marketplace-style tile: big picture (a second photo on hover), brand, a two-line title,
  * the price with the saving, a plain stock line, and a one-tap "Add to cart".
  * The whole tile links to the product; the button sits above the link.
+ * A product with no picture gets a drawn placeholder, and one with no price says "Price on request".
  */
 export function ProductCard({ product: p }: { product: ProductCardData }) {
   const cover = coverOf(p.media);
@@ -18,9 +20,10 @@ export function ProductCard({ product: p }: { product: ProductCardData }) {
   const hover = p.media.find((m) => m.kind === "IMAGE" && m.url !== cover?.url) ?? null;
   const hasVideo = p.media.some((m) => m.kind === "VIDEO");
   const status = stockStatus(p);
-  const onSale = p.salePriceNgn != null && p.salePriceNgn < p.priceNgn;
-  const percentOff = onSale ? Math.round(((p.priceNgn - p.salePriceNgn!) / p.priceNgn) * 100) : 0;
-  const purchasable = !p.availableOnRequest && p.stock > 0;
+  const price = effectivePrice(p);
+  const was = price != null && p.priceNgn != null && price < p.priceNgn ? p.priceNgn : null;
+  const percentOff = was != null && price != null ? Math.round(((was - price) / was) * 100) : 0;
+  const purchasable = canBuyOnline(p);
 
   return (
     <article className="group relative flex h-full flex-col overflow-hidden rounded-lg border border-line bg-surface transition-[border-color,box-shadow] duration-200 ease-out hover:border-line-strong hover:shadow-md focus-within:border-solar-300 focus-within:shadow-md">
@@ -45,7 +48,7 @@ export function ProductCard({ product: p }: { product: ProductCardData }) {
             )}
           </>
         ) : (
-          <div className="flex h-full items-center justify-center bg-sunken px-4 text-center text-sm text-subtle">{p.category.name}</div>
+          <ProductPlaceholder seed={p.name} />
         )}
         {percentOff > 0 && (
           <Badge tone="warning" variant="solid" className="absolute left-3 top-3">
@@ -66,7 +69,7 @@ export function ProductCard({ product: p }: { product: ProductCardData }) {
         </h3>
 
         <div className="mt-1">
-          <Price amount={effectivePrice(p)} was={onSale ? p.priceNgn : null} />
+          {price != null ? <Price amount={price} was={was} /> : <p className="font-display text-subtitle text-strong">Price on request</p>}
         </div>
 
         {/* Stock, in words: green when buyable, ember when nearly gone, plain when it is a question. */}
@@ -86,7 +89,7 @@ export function ProductCard({ product: p }: { product: ProductCardData }) {
             </form>
           ) : (
             <Link href={`/products/${p.slug}`} className={buttonClass({ variant: "outline", block: true })}>
-              {status.key === "out" ? "See details" : "Ask for a price"}
+              {price == null ? "Ask for a price" : "See details"}
             </Link>
           )}
         </div>

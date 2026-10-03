@@ -29,11 +29,21 @@ describe("planImport", () => {
     expect(r.rows[0].fields).toEqual({ priceNgn: 950_000 });
   });
 
-  it("requires name, category and price for new products", () => {
-    const r = planImport("sku,name\nNEW-1,Thing", ctx());
+  it("requires a name and a category for new products", () => {
+    const r = planImport("sku,price\nNEW-1,1000", ctx());
     expect(r.rows).toHaveLength(0);
+    expect(r.errors.map((e) => e.message).join(" ")).toMatch(/name/);
     expect(r.errors.map((e) => e.message).join(" ")).toMatch(/category/);
-    expect(r.errors.map((e) => e.message).join(" ")).toMatch(/price/);
+  });
+
+  it("creates a product with no price, and refuses a sale price without one", () => {
+    const ok = planImport("sku,name,category,price\nNEW-1,Thing,Inverters,", ctx());
+    expect(ok.errors).toEqual([]);
+    expect(ok.rows[0].fields.priceNgn).toBeUndefined();
+
+    const bad = planImport("sku,name,category,price,sale_price\nNEW-2,Thing,Inverters,,500", ctx());
+    expect(bad.rows).toHaveLength(0);
+    expect(bad.errors[0].message).toMatch(/needs a price/);
   });
 
   it("reports line numbers and keeps good rows", () => {

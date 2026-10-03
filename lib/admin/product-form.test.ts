@@ -26,10 +26,25 @@ describe("parseProductForm", () => {
     }
   });
 
-  it("reports missing name, category and price together", () => {
+  it("reports a missing name and category together", () => {
     const r = parseProductForm(form({}), template);
     expect(r.ok).toBe(false);
-    if (!r.ok) expect(Object.keys(r.errors)).toEqual(expect.arrayContaining(["name", "categoryId", "priceNgn"]));
+    if (!r.ok) expect(Object.keys(r.errors)).toEqual(expect.arrayContaining(["name", "categoryId"]));
+  });
+
+  it("accepts a product with no price, photos or video yet", () => {
+    const r = parseProductForm(form({ name: "Sako 2.56kWh Lithium Battery", categoryId: "cat1", stock: "0", status: "PUBLISHED" }), template);
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.data.priceNgn).toBeNull();
+      expect(r.data.media).toEqual([]);
+      expect(r.data.status).toBe("PUBLISHED");
+    }
+  });
+
+  it("refuses a sale price when there is no normal price", () => {
+    const r = parseProductForm(form({ name: "Sako 2.56kWh Lithium Battery", categoryId: "cat1", stock: "0", salePriceNgn: "500000" }), template);
+    expect(!r.ok && r.errors.salePriceNgn).toMatch(/normal price/);
   });
 
   it("rejects a sale price that is not lower", () => {

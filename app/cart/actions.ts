@@ -23,8 +23,11 @@ async function writeCart(lines: CartLine[]) {
 export async function addToCart(formData: FormData) {
   const productId = String(formData.get("productId") ?? "");
   const quantity = Number(formData.get("quantity") ?? 1);
-  // Only products that can really be bought online go in the cart.
-  const p = await db.product.findFirst({ where: { id: productId, status: "PUBLISHED", availableOnRequest: false, stock: { gt: 0 } }, select: { id: true } });
+  // Only products that can really be bought online go in the cart (the same rule as canBuyOnline).
+  const p = await db.product.findFirst({
+    where: { id: productId, status: "PUBLISHED", availableOnRequest: false, stock: { gt: 0 }, priceNgn: { not: null } },
+    select: { id: true },
+  });
   if (p) await writeCart(addLine(await readCart(), p.id, quantity));
   redirect("/cart");
 }

@@ -20,7 +20,8 @@ export interface ProductInput {
   brandId: string | null;
   /** Set when staff typed a brand that is not in the list yet; the server finds or creates it. */
   newBrandName: string | null;
-  priceNgn: number;
+  /** Null when staff leave the price empty: the product shows "Price on request" and is not sold online. */
+  priceNgn: number | null;
   salePriceNgn: number | null;
   stock: number;
   lowStockThreshold: number;
@@ -103,9 +104,12 @@ export function parseProductForm(form: FormLike, specTemplate: SpecField[]): Par
   const categoryId = text("categoryId", 60);
   if (!categoryId) errors.categoryId = "Choose a category";
 
-  const priceNgn = int("priceNgn", 1, MAX_PRICE, "Price");
+  const priceNgn = int("priceNgn", 1, MAX_PRICE, "Price", false);
   const salePriceNgn = int("salePriceNgn", 1, MAX_PRICE, "Sale price", false);
-  if (priceNgn != null && salePriceNgn != null && salePriceNgn >= priceNgn) errors.salePriceNgn = "Sale price must be lower than the normal price";
+  if (salePriceNgn != null && !errors.priceNgn) {
+    if (priceNgn == null) errors.salePriceNgn = "Enter the normal price before a sale price";
+    else if (salePriceNgn >= priceNgn) errors.salePriceNgn = "Sale price must be lower than the normal price";
+  }
 
   const stock = int("stock", 0, 100_000, "Stock") ?? 0;
   const lowStockThreshold = int("lowStockThreshold", 0, 10_000, "Low-stock level", false) ?? 2;
@@ -204,7 +208,7 @@ export function parseProductForm(form: FormLike, specTemplate: SpecField[]): Par
     }
   }
 
-  if (Object.keys(errors).length > 0 || !name || !categoryId || priceNgn == null) return { ok: false, errors };
+  if (Object.keys(errors).length > 0 || !name || !categoryId) return { ok: false, errors };
 
   return {
     ok: true,

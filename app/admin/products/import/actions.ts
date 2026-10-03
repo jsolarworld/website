@@ -56,7 +56,7 @@ export async function importProducts(_prev: ImportState, formData: FormData): Pr
       action: r.action,
       sku: r.sku,
       name: r.fields.name ?? "(unchanged)",
-      price: r.fields.priceNgn != null ? String(r.fields.priceNgn) : "(unchanged)",
+      price: r.fields.priceNgn != null ? String(r.fields.priceNgn) : r.action === "create" ? "Price on request" : "(unchanged)",
     })),
   };
   if (intent === "preview") return base;
@@ -78,7 +78,7 @@ export async function importProducts(_prev: ImportState, formData: FormData): Pr
           name: r.fields.name!,
           categoryId: r.fields.categoryId!,
           brandId: r.fields.brandId ?? null,
-          priceNgn: r.fields.priceNgn!,
+          priceNgn: r.fields.priceNgn ?? null,
           salePriceNgn: r.fields.salePriceNgn ?? null,
           stock: r.fields.stock ?? 0,
           status: r.fields.status ?? "DRAFT",
@@ -141,6 +141,6 @@ function updateData(r: ImportRow, prev: ImportContext["existing"] extends Map<st
   // A price drop must not leave an old sale price at or above the new price.
   const newPrice = (data.priceNgn as number | undefined) ?? prev.priceNgn;
   const sale = (data.salePriceNgn as number | undefined) ?? prev.salePriceNgn;
-  if (sale != null && sale >= newPrice) data.salePriceNgn = null;
+  if (sale != null && (newPrice == null || sale >= newPrice)) data.salePriceNgn = null;
   return data;
 }

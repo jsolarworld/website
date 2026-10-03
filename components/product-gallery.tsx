@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import { useEffect, useState, useSyncExternalStore } from "react";
+import { ProductPlaceholder } from "@/components/product-placeholder";
 import { cn } from "@/lib/cn";
 import { videoPoster, videoSrc, type MediaItem } from "@/lib/media";
 
@@ -30,6 +31,7 @@ function useReducedMotion() {
  * It plays like a slideshow: photos change every 5 seconds, and a video starts by itself (muted) and
  * hands over when it ends. Touching a thumbnail, or hovering or focusing the viewer, stops the slideshow so
  * nobody is moved on while they are looking. People who ask their device for reduced motion get no autoplay.
+ * A product with no pictures yet shows the drawn placeholder instead.
  */
 export function ProductGallery({ media, name }: { media: MediaItem[]; name: string }) {
   const [active, setActive] = useState(0);
@@ -51,7 +53,11 @@ export function ProductGallery({ media, name }: { media: MediaItem[]; name: stri
   }, [auto, active, current]);
 
   if (media.length === 0 || !current) {
-    return <div className="flex aspect-square items-center justify-center rounded-lg border border-line bg-sunken text-subtle">Photo coming soon</div>;
+    return (
+      <div className="aspect-square overflow-hidden rounded-lg border border-line">
+        <ProductPlaceholder seed={name} />
+      </div>
+    );
   }
 
   return (

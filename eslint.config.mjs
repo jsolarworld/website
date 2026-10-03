@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Second dev build folders (NEXT_DIST_DIR=.next-alt), gitignored like .next.
+    ".next-*/**",
   ]),
 ]);
 

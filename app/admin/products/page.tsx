@@ -140,6 +140,7 @@ export default async function AdminProducts({ searchParams }: { searchParams: Pr
             <tbody className="divide-y divide-line">
               {items.map((p) => {
                 const st = stockStatus(p);
+                const price = effectivePrice(p);
                 return (
                   <tr key={p.id} className="hover:bg-sunken">
                     <td className="px-4 py-3">
@@ -156,7 +157,7 @@ export default async function AdminProducts({ searchParams }: { searchParams: Pr
                       </p>
                     </td>
                     <td className="px-4 py-3 text-muted">{p.category.name}</td>
-                    <td className="numeric px-4 py-3 text-right">{formatNaira(effectivePrice(p))}</td>
+                    <td className="numeric px-4 py-3 text-right">{price != null ? formatNaira(price) : <span className="text-muted">Not set</span>}</td>
                     <td className="numeric px-4 py-3 text-right">
                       {p.availableOnRequest ? "On request" : p.stock}
                       {st.key === "low" && <span className="ml-1 text-ember-700">low</span>}

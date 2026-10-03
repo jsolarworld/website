@@ -38,8 +38,9 @@ export async function bulkPrices(_prev: PriceState, formData: FormData): Promise
   }
   const includeSale = formData.get("includeSale") === "on";
 
+  // Products with no price set are left alone: there is nothing to raise or lower.
   const products = await db.product.findMany({
-    where: { status: { not: "ARCHIVED" }, ...(categoryId ? { categoryId } : {}), ...(brandId ? { brandId } : {}) },
+    where: { status: { not: "ARCHIVED" }, priceNgn: { not: null }, ...(categoryId ? { categoryId } : {}), ...(brandId ? { brandId } : {}) },
     select: { id: true, name: true, priceNgn: true, salePriceNgn: true },
     orderBy: { name: "asc" },
   });
@@ -47,6 +48,7 @@ export async function bulkPrices(_prev: PriceState, formData: FormData): Promise
   const plan: { id: string; name: string; before: number; after: number; saleBefore: number | null; saleAfter: number | null }[] = [];
   let skipped = 0;
   for (const p of products) {
+    if (p.priceNgn == null) continue;
     const after = adjustPrice(p.priceNgn, adj);
     if (after == null) {
       skipped++;

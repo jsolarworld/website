@@ -3,10 +3,11 @@ import type { Prisma } from "../generated/prisma/client";
 
 export const PAGE_SIZE = 24;
 
+// Products with no price yet always come after the priced ones, whichever way the list is sorted.
 export const SORTS = {
   newest: { label: "Newest", orderBy: { createdAt: "desc" } },
-  "price-asc": { label: "Price: low to high", orderBy: { priceNgn: "asc" } },
-  "price-desc": { label: "Price: high to low", orderBy: { priceNgn: "desc" } },
+  "price-asc": { label: "Price: low to high", orderBy: { priceNgn: { sort: "asc", nulls: "last" } } },
+  "price-desc": { label: "Price: high to low", orderBy: { priceNgn: { sort: "desc", nulls: "last" } } },
 } as const satisfies Record<string, { label: string; orderBy: Prisma.ProductOrderByWithRelationInput }>;
 export type SortKey = keyof typeof SORTS;
 
@@ -20,7 +21,8 @@ const cardInclude = {
 export type ProductCardData = Prisma.ProductGetPayload<{ include: typeof cardInclude }>;
 
 export const getCategories = () => db.category.findMany({ orderBy: { sortOrder: "asc" } });
-export const getBrands = () => db.brand.findMany({ orderBy: { name: "asc" } });
+/** Brands a shopper can filter by: only those with something on the shelf. */
+export const getBrands = () => db.brand.findMany({ where: { products: { some: { status: "PUBLISHED" } } }, orderBy: { name: "asc" } });
 
 export const getFeaturedProducts = (limit = 8) =>
   db.product.findMany({
@@ -85,4 +87,9 @@ export function stockStatus(p: { stock: number; lowStockThreshold: number; avail
   return { key: "in", label: "In stock" } as const;
 }
 
-export const effectivePrice = (p: { priceNgn: number; salePriceNgn: number | null }) => p.salePriceNgn ?? p.priceNgn;
+/** What the customer pays (the sale price when there is one), or null when no price has been set yet. */
+export const effectivePrice = (p: { priceNgn: number | null; salePriceNgn: number | null }) => (p.priceNgn == null ? null : (p.salePriceNgn ?? p.priceNgn));
+
+/** Only a priced, in-stock product that is not "on request" can go in the cart. */
+export const canBuyOnline = (p: { priceNgn: number | null; stock: number; availableOnRequest: boolean }, quantity = 1) =>
+  p.priceNgn != null && !p.availableOnRequest && p.stock >= quantity;

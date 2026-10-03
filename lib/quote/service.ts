@@ -32,11 +32,13 @@ export async function loadPackages() {
   for (const r of rows) {
     const spec = r.packageSpec!;
     const unavailable = r.components.some((c) => !c.component.availableOnRequest && c.component.stock < c.quantity);
-    if (unavailable || (!r.availableOnRequest && r.stock <= 0)) continue;
+    // A package with no price cannot be quoted.
+    const price = effectivePrice(r);
+    if (unavailable || price == null || (!r.availableOnRequest && r.stock <= 0)) continue;
     packages.push({
       id: r.id,
       name: r.name,
-      price: effectivePrice(r),
+      price,
       chemistry: toChem(spec.chemistry),
       inverterContinuousW: spec.inverterContinuousW,
       inverterSurgeW: spec.inverterSurgeW,

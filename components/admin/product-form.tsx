@@ -121,7 +121,7 @@ export function ProductForm({ initial, categories, brands, componentOptions, can
 
       <Card>
         <CardBody className="grid gap-5 sm:grid-cols-2">
-          <Field name="priceNgn" label="Price (naira)" error={e.priceNgn}>
+          <Field name="priceNgn" label="Price (naira)" required={false} error={e.priceNgn} hint='Leave empty to show "Price on request"'>
             {(f) => <Input {...f} inputMode="numeric" defaultValue={initial.priceNgn} />}
           </Field>
           <Field name="salePriceNgn" label="Sale price (naira)" required={false} error={e.salePriceNgn} hint="Leave empty if not on sale">
