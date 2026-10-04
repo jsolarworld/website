@@ -25,7 +25,12 @@ import {
   buttonClass,
 } from "@/components/ui";
 import { ProductCard } from "@/components/product-card";
+import { BrandSystems } from "@/components/quote/brand-systems";
 import type { ProductCardData } from "@/lib/catalogue";
+import { APPLIANCES, itemFromAppliance } from "@/lib/quote/appliances";
+import { DEFAULT_SETTINGS } from "@/lib/quote/defaults";
+import { computeNeeds } from "@/lib/quote/engine";
+import { buildSystems } from "@/lib/quote/systems";
 import { SITE } from "@/lib/site";
 
 export const metadata: Metadata = {
@@ -72,6 +77,41 @@ const sampleProducts = [
 
 /* Class names are written out in full: Tailwind scans source text, so a
    template-literal class like `bg-${x}` would never be generated. */
+// Made-up ratings and prices, run through the real builder for a small home, so the sample shows what a customer would see.
+const samplePart = (name: string, price: number) => ({ id: name, name, slug: name.toLowerCase().replace(/[^a-z0-9]+/g, "-"), price, stock: null });
+const sampleNeeds = computeNeeds(
+  {
+    backupHours: 12,
+    items: [
+      ["led-bulb", 8, 6],
+      ["ceiling-fan", 3, 8],
+      ["tv-43", 1, 5],
+      ["refrigerator", 1, 24],
+      ["large-freezer", 1, 24],
+      ["washing-machine", 1, 1],
+      ["water-pump-1hp", 1, 1],
+    ].map(([id, qty, hours]) => itemFromAppliance(APPLIANCES.find((a) => a.id === id)!, qty as number, hours as number)),
+  },
+  DEFAULT_SETTINGS,
+);
+const sampleSystems = buildSystems(
+  sampleNeeds,
+  {
+    inverters: [
+      { ...samplePart("Felicity 6kVA Hybrid Inverter 48V", 950_000), brand: "Felicity", continuousW: 6000, surgeW: 12000, systemVoltage: 48 },
+      { ...samplePart("Deye 6kW Hybrid Inverter", 1_400_000), brand: "Deye", continuousW: 6000, surgeW: 12000, systemVoltage: 48 },
+    ],
+    batteries: [
+      { ...samplePart("Felicity 5kWh Lithium Battery 48V", 1_050_000), brand: "Felicity", chemistry: "lithium", wh: 5120, voltage: 51.2 },
+      { ...samplePart("Felicity 10kWh Lithium Battery 51.2V", 1_900_000), brand: "Felicity", chemistry: "lithium", wh: 10_240, voltage: 51.2 },
+      { ...samplePart("Deye 5kWh Lithium Battery", 950_000), brand: "Deye", chemistry: "lithium", wh: 5120, voltage: 51.2 },
+    ],
+    sets: [{ ...samplePart("Felicity All-in-One 8kVA Inverter with 10kWh Lithium Battery", 2_500_000), brand: "Felicity", continuousW: 8000, surgeW: 16000, batteryWh: 10_000 }],
+    panels: [{ ...samplePart("Jinko 650W Mono Solar Panel", 135_000), watts: 650 }],
+  },
+  DEFAULT_SETTINGS,
+).map((o, i) => ({ ...o, overBudget: i === 2 }));
+
 const ramps = [
   {
     name: "navy",
@@ -540,6 +580,21 @@ export default function DesignSystemPage() {
               </li>
             ))}
           </ul>
+        </Container>
+      </Section>
+
+      {/* ---------------------------------------------------------------- */}
+      <Section id="quote-systems" tone="surface">
+        <Container>
+          <SectionHeader
+            eyebrow="Components"
+            title="Quote: systems by brand"
+            lead="What the quote tool shows once products carry their ratings: one or two systems per brand, never mixed, cheapest first. The sample ratings and prices here are made up."
+          />
+
+          <div className="mt-12">
+            <BrandSystems systems={sampleSystems} />
+          </div>
         </Container>
       </Section>
 

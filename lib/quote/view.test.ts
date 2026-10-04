@@ -35,6 +35,30 @@ describe("buildView", () => {
     expect(buildView(matchPackages(needs, [pkg], DEFAULT_SETTINGS), 8, meta, 2_000_000).options[0].overBudget).toBe(false);
   });
 
+  it("carries the brand systems and marks the ones over budget", () => {
+    const system = {
+      id: "Felicity:separate",
+      brand: "Felicity",
+      kind: "separate" as const,
+      chemistry: "lithium" as const,
+      lines: [{ role: "inverter" as const, name: "Inverter", slug: "inv", quantity: 1, unitPriceNgn: 900_000 }],
+      totalNgn: 900_000,
+      inverterContinuousW: 3000,
+      batteryWh: 5120,
+      backupHours: 12,
+    };
+    const brand = { systems: [system], tooLarge: false, panel: { name: "Panel 650W", slug: "p650", watts: 650 } };
+    const v = buildView(matchPackages(needs, [], DEFAULT_SETTINGS), 8, meta, 500_000, brand);
+    expect(v.systems).toEqual([{ ...system, overBudget: true }]);
+    expect(v.panel?.watts).toBe(650);
+    expect(buildView(matchPackages(needs, [], DEFAULT_SETTINGS), 8, meta, 1_000_000, brand).systems![0].overBudget).toBe(false);
+  });
+
+  it("has no brand systems unless they are passed in", () => {
+    const v = buildView(matchPackages(needs, [pkg], DEFAULT_SETTINGS), 8, meta);
+    expect(v).toMatchObject({ systems: [], tooLarge: false, panel: null });
+  });
+
   it("is empty and custom when no package fits, and survives JSON", () => {
     const v = buildView(matchPackages(needs, [], DEFAULT_SETTINGS), 8, meta);
     expect(v.options).toHaveLength(0);

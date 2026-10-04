@@ -10,6 +10,8 @@ export const DEFAULT_SETTINGS: QuoteSettings = {
   diversityFactor: 0.7,
   budgetBatteryFloor: 0.6,
   quoteValidityDays: 7,
+  // Owner decision (2026-10-03): big systems are planned on site. 15 kW is a starting figure for him to confirm.
+  autoSizeLimitW: 15_000,
 };
 
 export const DEFAULT_BACKUP_HOURS = 12;

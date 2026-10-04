@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Badge, Card, CardBody, Container, Eyebrow, Notice, Panel, Price, SpecFigure, buttonClass } from "@/components/ui";
+import { BrandSystems } from "@/components/quote/brand-systems";
 import { getSavedQuote, isExpired } from "@/lib/quote/service";
 import { quoteSummary } from "@/lib/quote/summary";
 import type { QuoteView } from "@/lib/quote/view";
@@ -21,6 +22,8 @@ export default async function SavedQuotePage({ params }: Props) {
 
   const view = quote.result as unknown as QuoteView;
   const n = view.needs;
+  // Quotes saved before brand systems existed have none.
+  const systems = view.systems ?? [];
   const expired = isExpired(quote.validUntil);
   const url = `${SITE.url}/solar-quote/${quote.reference}`;
 
@@ -48,12 +51,14 @@ export default async function SavedQuotePage({ params }: Props) {
       </Panel>
 
       {view.options.length === 0 ? (
-        <Card className="mt-6">
-          <CardBody>
-            <h2 className="text-title">Next step: site inspection</h2>
-            <p className="mt-2 text-muted">Our engineer will contact you to size a system for this load.</p>
-          </CardBody>
-        </Card>
+        systems.length === 0 && (
+          <Card className="mt-6">
+            <CardBody>
+              <h2 className="text-title">Next step: site inspection</h2>
+              <p className="mt-2 text-muted">Our engineer will contact you to size a system for this load.</p>
+            </CardBody>
+          </Card>
+        )
       ) : (
         <div className="mt-6 grid gap-4 lg:grid-cols-3">
           {view.options.map((o) => (
@@ -74,6 +79,12 @@ export default async function SavedQuotePage({ params }: Props) {
               </CardBody>
             </Card>
           ))}
+        </div>
+      )}
+
+      {systems.length > 0 && (
+        <div className="mt-8">
+          <BrandSystems systems={systems} reference={quote.reference} />
         </div>
       )}
 

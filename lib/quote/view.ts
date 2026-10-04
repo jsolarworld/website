@@ -1,3 +1,4 @@
+import type { SystemOption } from "./systems";
 import type { Needs, PackageOption, QuoteResult } from "./types";
 
 /** Extra catalogue info the engine doesn't need but the results page does. */
@@ -25,22 +26,45 @@ export interface OptionView {
   overBudget: boolean;
 }
 
+export interface SystemView extends SystemOption {
+  /** True when the customer gave a budget and this system is above it. */
+  overBudget: boolean;
+}
+
+/** What was put together from single catalogue products, next to the approved packages. */
+export interface BrandSystems {
+  systems: SystemOption[];
+  /** The load is above the size quoted without a site visit, so no products are offered. */
+  tooLarge: boolean;
+  /** The panel the systems are counted with (cheapest per watt), if any panel is priced. */
+  panel: { name: string; slug: string; watts: number } | null;
+}
+
 /** JSON-safe snapshot of a quote result: what the customer sees, and what is stored on save. */
 export interface QuoteView {
   needs: Needs;
   backupHours: number;
   options: OptionView[];
-  /** No package fits: show the needs and route to a site inspection. */
+  /** No approved package fits. */
   custom: boolean;
   engineerReview: boolean;
+  // The three below are missing on quotes saved before brand systems existed.
+  /** One or two systems per brand, cheapest first. An engineer confirms them before installation. */
+  systems?: SystemView[];
+  tooLarge?: boolean;
+  panel?: BrandSystems["panel"];
 }
+
+const NO_SYSTEMS: BrandSystems = { systems: [], tooLarge: false, panel: null };
 
 export function buildView(
   result: QuoteResult,
   backupHours: number,
   meta: Map<string, PackageMeta>,
   budgetNgn?: number,
+  brand: BrandSystems = NO_SYSTEMS,
 ): QuoteView {
+  const over = (price: number) => budgetNgn != null && budgetNgn > 0 && price > budgetNgn;
   const toView = (label: OptionLabel, o: PackageOption | null): OptionView[] => {
     if (!o) return [];
     const m = meta.get(o.package.id);
@@ -57,7 +81,7 @@ export function buildView(
         batteryWh: o.package.batteryWh,
         arrayW: o.package.arrayW,
         components: m?.components ?? [],
-        overBudget: budgetNgn != null && budgetNgn > 0 && o.package.price > budgetNgn,
+        overBudget: over(o.package.price),
       },
     ];
   };
@@ -72,5 +96,8 @@ export function buildView(
     ],
     custom: result.custom,
     engineerReview: result.engineerReview,
+    systems: brand.systems.map((o) => ({ ...o, overBudget: over(o.totalNgn) })),
+    tooLarge: brand.tooLarge,
+    panel: brand.panel,
   };
 }

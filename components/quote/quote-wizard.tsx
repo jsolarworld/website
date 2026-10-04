@@ -18,6 +18,7 @@ import {
   SpecFigure,
   buttonClass,
 } from "@/components/ui";
+import { BrandSystems } from "./brand-systems";
 import { calculateQuote, saveQuoteAction } from "@/lib/quote/actions";
 import type { QuoteView } from "@/lib/quote/view";
 import { quoteSummary } from "@/lib/quote/summary";
@@ -64,6 +65,7 @@ const BACKUP_PRESETS = [
   { hours: 12, label: "12 hours (overnight)" },
 ];
 
+// Used to count panels only when no panel in the catalogue has a price yet.
 const PANEL_W = 550;
 const kwh = (wh: number) => (wh / 1000).toFixed(1);
 
@@ -409,7 +411,9 @@ function Results({
   onBack: () => void;
 }) {
   const n = view.needs;
-  const panels = Math.ceil(n.arrayW / PANEL_W);
+  const systems = view.systems ?? [];
+  const panelW = view.panel?.watts ?? PANEL_W;
+  const panels = Math.ceil(n.arrayW / panelW);
   const battery =
     chemistry === "" ? `${kwh(n.batteryWh.lithium)} kWh lithium or ${kwh(n.batteryWh.tubular)} kWh tubular` : `${kwh(n.batteryWh[chemistry])} kWh ${chemistry}`;
   const url = saved ? `${SITE.url}/solar-quote/${saved}` : undefined;
@@ -423,28 +427,37 @@ function Results({
           <SpecFigure onChassis label="Inverter" value={Math.ceil(n.inverterContinuousW).toLocaleString("en-NG")} unit="W or more" note={`Must handle ${Math.ceil(n.inverterSurgeW).toLocaleString("en-NG")} W at start-up`} />
           <SpecFigure onChassis label="Used per day" value={(n.dailyWh / 1000).toFixed(1)} unit="kWh" />
           <SpecFigure onChassis label={`Battery for ${view.backupHours}h`} value={n.backupLoadW > 0 ? battery : "None"} />
-          <SpecFigure onChassis label="Solar panels" value={`${panels}`} unit={`× ${PANEL_W} W`} note={`about ${Math.round(n.arrayW).toLocaleString("en-NG")} W in total`} />
+          <SpecFigure onChassis label="Solar panels" value={`${panels}`} unit={`× ${panelW} W`} note={`about ${Math.round(n.arrayW).toLocaleString("en-NG")} W in total`} />
         </div>
       </Panel>
 
-      {view.engineerReview && (
+      {n.highDrawOnBackup && (
         <Notice tone="warning" title="An engineer will check this one">
-          Your list has heavy appliances on battery, or we don&apos;t have a ready package that fits. We&apos;ll confirm the right system with you.
+          Your list has heavy appliances running on battery. We&apos;ll confirm the right system with you.
         </Notice>
       )}
 
       {view.custom ? (
-        <Card>
-          <CardBody>
-            <h2 className="text-title">Let&apos;s size this properly</h2>
-            <p className="mt-2 text-muted">
-              We don&apos;t have a ready-made package that covers everything you listed. Save your quote below and our engineer will call you to plan a
-              system, or book a site inspection.
-            </p>
-          </CardBody>
-        </Card>
+        systems.length === 0 && (
+          <Card>
+            <CardBody>
+              <h2 className="text-title">{view.tooLarge ? "This is a big system. Let's plan it on site" : "Let's size this properly"}</h2>
+              <p className="mt-2 text-muted">
+                {view.tooLarge
+                  ? "A load this size needs a system designed by our engineer, so we don't show ready prices for it. Save your quote below and we'll call you to arrange a site inspection."
+                  : "We don't have a ready system that covers everything you listed. Save your quote below and our engineer will call you to plan one, or book a site inspection."}
+              </p>
+            </CardBody>
+          </Card>
+        )
       ) : (
         <div className="grid gap-4 lg:grid-cols-3">
+          {systems.length > 0 && (
+            <div className="lg:col-span-3">
+              <h2 className="text-title">Complete packages</h2>
+              <p className="mt-1 text-sm text-muted">Checked by our engineer as a whole system.</p>
+            </div>
+          )}
           {view.options.map((o) => (
             <Card key={o.packageId} className="flex flex-col">
               <CardBody className="flex flex-1 flex-col gap-3">
@@ -482,6 +495,8 @@ function Results({
           ))}
         </div>
       )}
+
+      <BrandSystems systems={systems} reference={saved ?? undefined} />
 
       {saved ? (
         <Card>

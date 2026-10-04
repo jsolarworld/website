@@ -42,6 +42,8 @@ export interface QuoteSettings {
   /** Budget option must carry at least this share of the battery need. */
   budgetBatteryFloor: number;
   quoteValidityDays: number;
+  /** Above this inverter need (continuous watts) no products are offered: the customer is sent to a site visit. */
+  autoSizeLimitW: number;
 }
 
 export interface Needs {
