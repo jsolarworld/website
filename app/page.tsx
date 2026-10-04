@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Card, CardBody, Container, Eyebrow, Rule, Section, SectionHeader, buttonClass } from "@/components/ui";
 import { ProductCard } from "@/components/product-card";
 import { getCategories, getFeaturedProducts } from "@/lib/catalogue";
-import { SITE, jsonLd, telLink, whatsappLink } from "@/lib/site";
+import { SITE, jsonLd, localBusiness, telLink, whatsappLink } from "@/lib/site";
 
 export const revalidate = 60;
 
@@ -14,29 +14,6 @@ const STEPS = [
 
 export default async function Home() {
   const [categories, featured] = await Promise.all([getCategories(), getFeaturedProducts(8)]);
-
-  const localBusiness = {
-    "@context": "https://schema.org",
-    "@type": "LocalBusiness",
-    name: SITE.name,
-    url: SITE.url,
-    telephone: `+234${SITE.phones[0].slice(1)}`,
-    email: SITE.email,
-    slogan: SITE.slogan,
-    address: {
-      "@type": "PostalAddress",
-      streetAddress: "F-Line 1424, Ojo Alaba International Market",
-      addressLocality: "Ojo",
-      addressRegion: "Lagos",
-      addressCountry: "NG",
-    },
-    openingHoursSpecification: {
-      "@type": "OpeningHoursSpecification",
-      dayOfWeek: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"],
-      opens: "00:00",
-      closes: "23:59",
-    },
-  };
 
   return (
     <>

@@ -5,13 +5,14 @@ import { requireStaff } from "@/lib/admin/guard";
 import { can } from "@/lib/admin/permissions";
 import { db } from "@/lib/db";
 import { telLink, whatsappLink } from "@/lib/site";
-import type { LeadStatus } from "@/generated/prisma/client";
+import type { LeadSource, LeadStatus } from "@/generated/prisma/client";
 
 export const metadata = { title: "Leads & quotes" };
 
 const STATUSES: LeadStatus[] = ["NEW", "CONTACTED", "INSPECTION_BOOKED", "WON", "LOST"];
 const LABEL: Record<LeadStatus, string> = { NEW: "New", CONTACTED: "Contacted", INSPECTION_BOOKED: "Inspection booked", WON: "Won", LOST: "Lost" };
 const TONE = { NEW: "solar", CONTACTED: "brand", INSPECTION_BOOKED: "brand", WON: "positive", LOST: "neutral" } as const;
+const SOURCE: Record<LeadSource, string> = { QUOTE: "Quote", CONTACT_FORM: "Contact form", BOOKING: "Booking", WHATSAPP: "WhatsApp" };
 
 const dateFmt = new Intl.DateTimeFormat("en-NG", { day: "2-digit", month: "2-digit", year: "numeric", timeZone: "Africa/Lagos" });
 
@@ -56,7 +57,7 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
       </nav>
 
       {leads.length === 0 ? (
-        <EmptyState className="mt-6" title="No leads yet" description="When someone saves a quote on the website, they appear here with their phone number." />
+        <EmptyState className="mt-6" title="No leads yet" description="When someone saves a quote or sends a message from the About page, they appear here with their phone number." />
       ) : (
         <ul className="mt-6 space-y-3">
           {leads.map((l) => (
@@ -66,11 +67,13 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
                   <p className="font-medium text-strong">{l.name ?? "No name given"}</p>
                   <p className="text-sm text-muted numeric">
                     {l.phone} · {dateFmt.format(l.createdAt)}
-                    {l.email ? ` · ${l.email}` : ""}
+                    {l.email ? ` · ${l.email}` : ""} · {SOURCE[l.source]}
                   </p>
                 </div>
                 <Badge tone={TONE[l.status]}>{LABEL[l.status]}</Badge>
               </div>
+
+              {l.message && <p className="mt-2 whitespace-pre-line rounded-md bg-sunken px-3 py-2 text-sm">{l.message}</p>}
 
               {l.quotes.length > 0 && (
                 <p className="mt-2 text-sm">

@@ -14,6 +14,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: at("/") },
     { url: at("/products") },
     { url: at("/solar-quote") },
+    { url: at("/about") },
     { url: at("/track-order") },
     { url: at("/delivery") },
     { url: at("/returns-and-warranty") },
