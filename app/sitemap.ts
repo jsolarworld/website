@@ -5,9 +5,10 @@ import { SITE } from "@/lib/site";
 export const revalidate = 3600;
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const [products, categories] = await Promise.all([
+  const [products, categories, services] = await Promise.all([
     db.product.findMany({ where: { status: "PUBLISHED" }, select: { slug: true, updatedAt: true } }),
     db.category.findMany({ select: { slug: true } }),
+    db.service.findMany({ where: { published: true }, select: { slug: true } }),
   ]);
   const at = (path: string) => `${SITE.url}${path}`;
   return [
@@ -15,6 +16,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: at("/products") },
     { url: at("/solar-quote") },
     { url: at("/about") },
+    { url: at("/services") },
+    ...services.map((s) => ({ url: at(`/services/${s.slug}`) })),
     { url: at("/track-order") },
     { url: at("/delivery") },
     { url: at("/returns-and-warranty") },

@@ -12,7 +12,7 @@ export default async function AdminHome({ searchParams }: { searchParams: Promis
   const { denied } = await searchParams;
   const catalogue = can(staff.role, "catalogue:read");
 
-  const [published, drafts, lowStock, newLeads, packages, unapproved, gaps] = await Promise.all([
+  const [published, drafts, lowStock, newLeads, packages, unapproved, gaps, newBookings] = await Promise.all([
     db.product.count({ where: { status: "PUBLISHED" } }),
     db.product.count({ where: { status: "DRAFT" } }),
     // Prisma cannot compare two columns, so filter a bounded list in memory.
@@ -34,6 +34,7 @@ export default async function AdminHome({ searchParams }: { searchParams: Promis
           { key: "quote", count: quote, label: "Missing quote tool details", note: "Price, brand or ratings" },
         ])
       : Promise.resolve([]),
+    can(staff.role, "leads:read") ? db.serviceBooking.count({ where: { status: "NEW" } }) : Promise.resolve(null),
   ]);
   const toFinish = gaps.filter((g) => g.count > 0);
 
@@ -63,9 +64,12 @@ export default async function AdminHome({ searchParams }: { searchParams: Promis
           </CardBody>
         </Card>
         {newLeads !== null && (
-          <Card>
+          <Card interactive>
             <CardBody>
-              <SpecFigure label="New leads" value={newLeads} />
+              <SpecFigure label="New leads" value={newLeads} note={newBookings ? `${newBookings} new service booking${newBookings === 1 ? "" : "s"}` : undefined} />
+              <Link href={newBookings ? "/admin/bookings?status=NEW" : "/admin/leads?status=NEW"} className="mt-3 inline-block text-sm text-navy-600 underline underline-offset-4 after:absolute after:inset-0">
+                {newBookings ? "See bookings" : "See leads"}
+              </Link>
             </CardBody>
           </Card>
         )}

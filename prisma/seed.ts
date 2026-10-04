@@ -97,6 +97,44 @@ const BRANDS = [
   "Blue Power", "Blue Carbon", "Ecolion", "Cworth",
 ];
 
+// Services (PRD SRV-02). The owner has confirmed installation of complete systems; the site inspection is where the
+// quote tool sends big or unusual jobs. The last two are the PRD's proposals and stay hidden until the owner confirms
+// them (switch on at /admin/bookings). No "from" prices: none have been given.
+const SERVICES: { slug: string; name: string; summary: string; body: string; published: boolean }[] = [
+  {
+    slug: "solar-installation",
+    name: "Solar system installation",
+    summary: "We install the complete solar systems we sell, for homes, shops and offices.",
+    body:
+      "We install complete systems bought from us: the inverter, the batteries, the solar panels and the wiring between them.\n\n" +
+      "Before any work starts, we agree the design and the installation price with you. Transport to your site is billed separately where it applies.",
+    published: true,
+  },
+  {
+    slug: "site-inspection",
+    name: "Site inspection",
+    summary: "An engineer visits, looks at your building and appliances, and recommends the right system.",
+    body:
+      "Book a site inspection when your load is too big or unusual for an instant quote, or when you want an engineer to see the building before you buy.\n\n" +
+      "The engineer checks where the panels, inverter and batteries can go and what you want to power, then recommends a system and gives you a price. Any visit or transport fee is agreed with you before the visit.",
+    published: true,
+  },
+  {
+    slug: "maintenance-and-repairs",
+    name: "Maintenance and repairs",
+    summary: "Checks, cleaning and fault finding on solar and inverter systems.",
+    body: "We check connections, batteries and panels, clean the panels, and find and fix faults on solar and inverter systems.",
+    published: false,
+  },
+  {
+    slug: "battery-and-inverter-replacement",
+    name: "Battery and inverter replacement",
+    summary: "Replace an old battery bank or inverter, or upgrade your system to carry more.",
+    body: "We replace worn-out batteries and inverters, and upgrade systems that no longer carry what you need to power.",
+    published: false,
+  },
+];
+
 const slugify = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
 
 async function main() {
@@ -126,6 +164,11 @@ async function main() {
     await db.appliance.upsert({ where: { slug: a.id }, update: data, create: { slug: a.id, ...data } });
   }
 
+  // Services: create only, so whether each one is shown (switched in admin) is never reset by a re-seed.
+  for (const [i, s] of SERVICES.entries()) {
+    await db.service.upsert({ where: { slug: s.slug }, update: {}, create: { ...s, sortOrder: i } });
+  }
+
   // Settings: create only if missing, so admin edits are never overwritten by a re-seed.
   await db.setting.upsert({
     where: { key: "quote.settings" },
@@ -134,7 +177,7 @@ async function main() {
   });
 
   console.log(
-    `Seeded ${CATEGORIES.length} categories, ${BRANDS.length} brands, ${APPLIANCES.length} appliances, quote settings.`,
+    `Seeded ${CATEGORIES.length} categories, ${BRANDS.length} brands, ${APPLIANCES.length} appliances, ${SERVICES.length} services, quote settings.`,
   );
 }
 

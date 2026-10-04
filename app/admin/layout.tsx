@@ -14,6 +14,7 @@ const NAV: { href: string; label: string; needs: Permission }[] = [
   { href: "/admin/products", label: "Products", needs: "catalogue:read" },
   { href: "/admin/orders", label: "Orders", needs: "orders:read" },
   { href: "/admin/leads", label: "Leads & quotes", needs: "leads:read" },
+  { href: "/admin/bookings", label: "Bookings", needs: "leads:read" },
   { href: "/admin/products/prices", label: "Bulk prices", needs: "catalogue:write" },
   { href: "/admin/products/import", label: "CSV import", needs: "catalogue:write" },
   { href: "/admin/staff", label: "Staff", needs: "staff:manage" },
