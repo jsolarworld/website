@@ -85,6 +85,22 @@ const CATEGORIES: { slug: string; name: string; specTemplate: Spec[] }[] = [
     name: "Solar Street Lights",
     specTemplate: [num("watts", "Power", "W"), text("type", "Type", true)],
   },
+  {
+    slug: "charge-controllers",
+    name: "Charge Controllers",
+    // Battery voltage is text: one controller often serves 12, 24 and 48 V systems.
+    specTemplate: [num("currentA", "Charge current", "A"), text("systemVoltage", "Battery voltage"), text("type", "Type", true)],
+  },
+  {
+    slug: "solar-pumps",
+    name: "Solar Water Pumps",
+    specTemplate: [num("powerHp", "Motor size", "HP"), num("powerW", "Power", "W", false), num("maxHeadM", "Maximum head", "m", false), text("type", "Type", true)],
+  },
+  {
+    slug: "stabilizers",
+    name: "Voltage Stabilizers",
+    specTemplate: [num("ratedKva", "Rating", "kVA"), text("phase", "Phase", true)],
+  },
   { slug: "solar-packages", name: "Solar Packages", specTemplate: [] },
   { slug: "accessories", name: "Accessories and Protection", specTemplate: [text("type", "Type", true)] },
   { slug: "cables-and-components", name: "Cables and System Components", specTemplate: [text("type", "Type", true)] },

@@ -5,7 +5,7 @@ import { UPLOAD_FOLDER, parseCloudinaryUrl, signParams } from "../lib/cloudinary
 import { db } from "../lib/db";
 import { isCloudinaryMedia, type MediaKind } from "../lib/media";
 import { slugify } from "../lib/slug";
-import { BRAND_RENAMES, CHAT_PRODUCTS, type ChatMedia, type ChatProduct } from "./chat-products";
+import { BRAND_RENAMES, CHAT_ADDITIONS, CHAT_PRODUCTS, type ChatMedia, type ChatProduct } from "./chat-products";
 
 // Usage: pnpm import:chat            check the list against the database and the chat/ folder; changes nothing
 //        pnpm import:chat --apply    upload the photos and videos to Cloudinary and create the products
@@ -14,6 +14,9 @@ import { BRAND_RENAMES, CHAT_PRODUCTS, type ChatMedia, type ChatProduct } from "
 // Safe to run again: a product whose web address already exists (or once existed and was renamed) is skipped and
 // never overwritten, and a file already uploaded is reused. Every product arrives as "available on request" with
 // no stock count, so nothing can be bought online until staff enter the stock.
+//
+// CHAT_ADDITIONS are later photos for products already on the site: a photo is added once, after the ones the
+// product has, and a description is filled in only while the product has none.
 
 const apply = process.argv.includes("--apply");
 const pricedOnly = process.argv.includes("--priced-only");
@@ -41,16 +44,23 @@ async function retry<T>(what: string, run: () => Promise<T>): Promise<T> {
   }
 }
 
+/** The Cloudinary name of a chat file: its file name, plus the crop when there is one. */
+const publicId = (m: ChatMedia) => `chat-${m.file.replace(/\.[a-z0-9]+$/i, "").toLowerCase()}${m.crop ? `-c${m.crop.join("-")}` : ""}`;
+
+// One picture often stands for several sizes of a model, so each file is sent once per run.
+const uploaded = new Map<string, string>();
+
 /** Upload one file from chat/. The public id comes from the file name (and crop), so a second run reuses the upload. */
 async function upload(m: ChatMedia): Promise<string> {
+  const sent = uploaded.get(publicId(m));
+  if (sent) return sent;
   const cfg = parseCloudinaryUrl(process.env.CLOUDINARY_URL);
   if (!cfg) throw new Error("CLOUDINARY_URL is not set");
   const kind = kindOf(m.file);
-  const base = m.file.replace(/\.[a-z0-9]+$/i, "").toLowerCase();
   const params: Record<string, string | number> = {
     folder: UPLOAD_FOLDER,
     overwrite: "false",
-    public_id: `chat-${base}${m.crop ? `-c${m.crop.join("-")}` : ""}`,
+    public_id: publicId(m),
     timestamp: Math.floor(Date.now() / 1000),
   };
   if (m.crop) {
@@ -68,21 +78,28 @@ async function upload(m: ChatMedia): Promise<string> {
   const json = (await res.json().catch(() => null)) as { secure_url?: string; error?: { message?: string } } | null;
   if (!res.ok || !json?.secure_url) throw new Error(`${m.file}: ${json?.error?.message ?? `upload failed (${res.status})`}`);
   if (!isCloudinaryMedia(kind, json.secure_url)) throw new Error(`${m.file}: unexpected upload address ${json.secure_url}`);
+  uploaded.set(publicId(m), json.secure_url);
   return json.secure_url;
 }
 
 async function main() {
   const [categories, existing, redirects] = await retry("reading the catalogue", () =>
-    Promise.all([db.category.findMany(), db.product.findMany({ select: { slug: true } }), db.redirect.findMany({ select: { fromPath: true } })]),
+    Promise.all([
+      db.category.findMany(),
+      db.product.findMany({ select: { id: true, slug: true, name: true, description: true, media: { select: { url: true, sortOrder: true } } } }),
+      db.redirect.findMany({ select: { fromPath: true, toPath: true } }),
+    ]),
   );
   const categoryBySlug = new Map(categories.map((c) => [c.slug, c]));
+  const productBySlug = new Map(existing.map((p) => [p.slug, p]));
+  const address = (path: string) => path.replace(/^\/products\//, "");
   // A renamed product leaves a redirect from its old address, so it is not created a second time.
-  const taken = new Set([...existing.map((p) => p.slug), ...redirects.map((r) => r.fromPath.replace(/^\/products\//, ""))]);
+  const taken = new Set([...existing.map((p) => p.slug), ...redirects.map((r) => address(r.fromPath))]);
+  const movedTo = new Map(redirects.map((r) => [address(r.fromPath), address(r.toPath)]));
 
   // Check the whole list before touching anything.
   const problems: string[] = [];
   const seen = new Set<string>();
-  const usedFiles = new Map<string, string>();
   for (const p of CHAT_PRODUCTS) {
     const slug = slugify(p.name);
     if (!slug) problems.push(`${p.name}: cannot make a web address from this name`);
@@ -98,12 +115,27 @@ async function main() {
     }
     if (p.priceNgn != null && (!Number.isInteger(p.priceNgn) || p.priceNgn < 1)) problems.push(`${p.name}: bad price`);
     for (const m of p.media) {
-      if (!existsSync(path.join(CHAT_DIR, m.file))) problems.push(`${p.name}: chat/${m.file} is missing`);
+      // The chat folder is replaced by each new export, so only a product still to be created needs its files.
+      if (!taken.has(slug) && !existsSync(path.join(CHAT_DIR, m.file))) problems.push(`${p.name}: chat/${m.file} is missing`);
       if (!m.alt.trim()) problems.push(`${p.name}: ${m.file} needs a description`);
-      const other = usedFiles.get(m.file);
-      if (other) problems.push(`${m.file} is used by both "${other}" and "${p.name}"`);
-      usedFiles.set(m.file, p.name);
     }
+  }
+
+  // Later photos and descriptions for products already on the site: keep only what each product still lacks.
+  const additions: { product: (typeof existing)[number]; media: ChatMedia[]; description?: string }[] = [];
+  for (const a of CHAT_ADDITIONS) {
+    const product = productBySlug.get(a.slug) ?? productBySlug.get(movedTo.get(a.slug) ?? "");
+    if (!product) {
+      problems.push(`Addition for "${a.slug}": no product has this web address`);
+      continue;
+    }
+    const media = a.media.filter((m) => !product.media.some((have) => have.url.includes(`/${publicId(m)}.`)));
+    for (const m of media) {
+      if (!existsSync(path.join(CHAT_DIR, m.file))) problems.push(`${product.name}: chat/${m.file} is missing`);
+      if (!m.alt.trim()) problems.push(`${product.name}: ${m.file} needs a description`);
+    }
+    const description = product.description?.trim() ? undefined : a.description;
+    if (media.length > 0 || description) additions.push({ product, media, description });
   }
   if (problems.length > 0) {
     console.error(`The list has ${problems.length} problem(s). Nothing was changed.\n- ${problems.join("\n- ")}`);
@@ -126,13 +158,17 @@ async function main() {
     const price = p.priceNgn != null ? `₦${p.priceNgn.toLocaleString("en-NG")}` : "no price";
     console.log(`  ${p.status === "DRAFT" ? "[draft] " : ""}${p.name} | ${p.category} | ${p.brand ?? "no brand"} | ${price} | ${p.media.length || "no"} file(s)`);
   }
+  if (additions.length > 0) {
+    console.log(`\n${additions.length} product(s) already on the site get something new:`);
+    for (const a of additions) console.log(`  ${a.product.name} | ${a.media.length || "no"} new file(s)${a.description ? " | a description" : ""}`);
+  }
   const notes = todo.filter((p) => p.note);
   if (notes.length > 0) console.log(`\nTo check:\n${notes.map((p) => `- ${p.name}: ${p.note}`).join("\n")}`);
   if (!apply) {
     console.log("\nNothing was changed. Run again with --apply to upload and create these.");
     return;
   }
-  if (todo.length === 0) return;
+  if (todo.length === 0 && additions.length === 0) return;
 
   // Brand names as printed on the products (see BRAND_RENAMES), then find or create each brand the list uses.
   for (const fix of BRAND_RENAMES) {
@@ -171,6 +207,7 @@ async function main() {
             kind: "PRODUCT",
             slug,
             name: p.name,
+            description: p.description ?? null,
             categoryId: categoryBySlug.get(p.category)!.id,
             brandId: p.brand ? brandIds.get(p.brand)! : null,
             priceNgn: p.priceNgn,
@@ -191,14 +228,44 @@ async function main() {
     }
   }
 
-  if (created.length > 0) {
+  const added: { id: string; name: string; files: number; description: boolean }[] = [];
+  for (const a of additions) {
+    try {
+      const last = Math.max(-1, ...a.product.media.map((m) => m.sortOrder));
+      const media: { kind: MediaKind; url: string; alt: string; sortOrder: number }[] = [];
+      for (const [i, m] of a.media.entries()) {
+        media.push({ kind: kindOf(m.file), url: await retry(m.file, () => upload(m)), alt: m.alt, sortOrder: last + 1 + i });
+      }
+      await retry(a.product.name, async () => {
+        // A retry after a dropped connection must not add the same photo twice.
+        const have = await db.productMedia.findMany({ where: { productId: a.product.id }, select: { url: true } });
+        const fresh = media.filter((m) => !have.some((h) => h.url === m.url));
+        await db.product.update({
+          where: { id: a.product.id },
+          data: { ...(a.description ? { description: a.description } : {}), media: { create: fresh } },
+        });
+      });
+      added.push({ id: a.product.id, name: a.product.name, files: media.length, description: Boolean(a.description) });
+      console.log(`added to: ${a.product.name}`);
+    } catch (e) {
+      failed.push(`${a.product.name}: ${(e as Error).message ?? e}`);
+      console.error(`FAILED: ${a.product.name}: ${(e as Error).message ?? e}`);
+    }
+  }
+
+  if (created.length > 0 || added.length > 0) {
     await retry("audit log", () =>
       db.auditLog.create({
-        data: { action: "product.import", entity: "Product", entityId: "bulk", after: { source: "WhatsApp chat export (scripts/import-chat-products.ts)", created: created.length, products: created } },
+        data: {
+          action: "product.import",
+          entity: "Product",
+          entityId: "bulk",
+          after: { source: "WhatsApp chat export (scripts/import-chat-products.ts)", created: created.length, products: created, addedTo: added },
+        },
       }),
     );
   }
-  console.log(`\nDone: ${created.length} created${failed.length ? `, ${failed.length} failed (run again to retry them)` : ""}.`);
+  console.log(`\nDone: ${created.length} created${added.length ? `, ${added.length} already on the site added to` : ""}${failed.length ? `, ${failed.length} failed (run again to retry them)` : ""}.`);
   if (failed.length > 0) process.exitCode = 1;
 }
 
