@@ -5,8 +5,8 @@ type Row = [id: string, name: string, category: Appliance["category"], watts: nu
 // PRD 7.5 starter values. Typical ratings only: engineers confirm them before launch.
 // Added for the owner on 2026-10-03 (not in the PRD; engineers confirm these too): the large freezer,
 // both inverter air conditioners, the 1 HP and 1.5 HP pumps and the instant shower heater. Pumps that big
-// start off battery backup like the heaters: they usually run in daylight, and on battery alone a pump
-// used for an hour would size the battery as if it ran all night.
+// start off the system like the heaters: on battery, a pump used for an hour would size the battery as if
+// it ran all night. Since 2026-10-11 "off" means left out of the inverter and the panels too (see engine.ts).
 const ROWS: Row[] = [
   ["led-bulb", "LED bulb", "lighting", 10, 1, 1],
   ["phone-charger", "Phone charger", "work", 10, 1, 1],
@@ -54,7 +54,7 @@ export const APPLIANCES: Appliance[] = ROWS.map(
   }),
 );
 
-/** Build a quote line from a library appliance. High-draw items default off backup (PRD QTE-05). */
+/** Build a quote line from a library appliance. High-draw items start off the system (PRD QTE-05). */
 export function itemFromAppliance(
   a: Appliance,
   quantity: number,

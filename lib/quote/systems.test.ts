@@ -182,19 +182,16 @@ describe("buildSystems", () => {
     expect(fullyPriced(o)).toBe(false);
   });
 
-  it("takes the cheapest priced pairing, unless one with no price is a closer fit", () => {
+  it("gives a brand's fully priced pairing whenever it has one, so the customer sees a total", () => {
     const inv = inverter("inv", "Felicity", 400_000);
     const big = lithium("big", "Felicity", 2_000_000, 16_000);
-    const sameSize = buildSystems(needs, parts({ inverters: [inv], batteries: [lithium("priced", "Felicity", 550_000, 5120), lithium("open", "Felicity", null, 5120)] }), s);
-    expect(sameSize[0].lines[1].slug).toBe("priced");
-    // The only priced battery is three times the need; the right-sized one has no price yet.
-    const closer = buildSystems(needs, parts({ inverters: [inv], batteries: [big, lithium("open", "Felicity", null, 5120)] }), s);
-    expect(closer[0].lines[1].slug).toBe("open");
-    // A slightly smaller bank does not win when its priced parts already cost more than the priced pairing.
-    const batteries = [lithium("b5", "Felicity", 550_000, 5120), lithium("b44", "Felicity", 1_200_000, 4400)];
-    const dearer = buildSystems(needs, parts({ inverters: [inv, inverter("open-inv", "Felicity", null)], batteries }), s);
-    expect(dearer[0].lines.map((l) => l.slug).slice(0, 2)).toEqual(["inv", "b5"]);
-    // With nothing priced, the smallest battery that covers the need.
+    // Even when the priced battery is bigger than needed, and whichever part is missing its price.
+    const battery = buildSystems(needs, parts({ inverters: [inv], batteries: [big, lithium("open", "Felicity", null, 5120)] }), s);
+    expect(battery[0].lines[1].slug).toBe("big");
+    const inverters = buildSystems(needs, parts({ inverters: [inv, inverter("open-inv", "Felicity", null)], batteries: [big] }), s);
+    expect(inverters[0].lines[0].slug).toBe("inv");
+    expect(fullyPriced(inverters[0])).toBe(true);
+    // With nothing priced in full, the smallest battery that covers the need.
     const none = buildSystems(needs, parts({ inverters: [inv], batteries: [{ ...big, price: null }, lithium("open", "Felicity", null, 5120)] }), s);
     expect(none[0].lines[1].slug).toBe("open");
   });

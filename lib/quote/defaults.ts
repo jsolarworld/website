@@ -14,6 +14,9 @@ export const DEFAULT_SETTINGS: QuoteSettings = {
   autoSizeLimitW: 15_000,
   // Decided 2026-10-11: at 4 sun hours this refills a system's own battery in about a day. Engineers confirm.
   panelWPerBatteryWh: 0.3,
+  // Decided 2026-10-11: most inverters in the catalogue have only a kVA figure. 0.8 is the usual rating
+  // (10 kVA = 8,000 W) and matches every Yohako model that has both figures; real watts replace it once entered.
+  inverterPowerFactor: 0.8,
 };
 
 export const DEFAULT_BACKUP_HOURS = 12;

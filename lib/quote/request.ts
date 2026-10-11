@@ -39,6 +39,9 @@ function str(v: unknown, max: number): string | undefined {
   return t || undefined;
 }
 
+// Shared with the wizard, which shows it before the customer can go on.
+export const NOTHING_ON_ERROR = "Tick at least one appliance for the solar system to power";
+
 export function parseQuoteRequest(raw: unknown): Result<QuoteRequest> {
   if (!isObj(raw) || !Array.isArray(raw.items)) return { ok: false, error: "Invalid request" };
   if (raw.items.length === 0) return { ok: false, error: "Add at least one appliance" };
@@ -67,6 +70,9 @@ export function parseQuoteRequest(raw: unknown): Result<QuoteRequest> {
       onBackup: it.onBackup !== false,
     });
   }
+
+  // Appliances left off the system are not sized for, so a list of only those leaves nothing to quote.
+  if (!items.some((i) => i.onBackup)) return { ok: false, error: NOTHING_ON_ERROR };
 
   const backupHours = num(raw.backupHours, 1, 48);
   if (backupHours == null) return { ok: false, error: "Choose how many hours of backup you need" };

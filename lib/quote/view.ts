@@ -53,6 +53,11 @@ export interface QuoteView {
   systems?: SystemView[];
   tooLarge?: boolean;
   panel?: BrandSystems["panel"];
+  /**
+   * Heavy appliances the customer left off the system: nothing above is sized for them. Missing on quotes
+   * saved before 2026-10-11, when such appliances still counted towards the inverter and the panels.
+   */
+  leftOff?: string[];
 }
 
 const NO_SYSTEMS: BrandSystems = { systems: [], tooLarge: false, panel: null };

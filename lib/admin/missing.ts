@@ -24,6 +24,12 @@ export const QUOTE_FIELDS: Record<string, (string | string[])[]> = {
  */
 const QUOTE_OPTIONAL = new Set(["surgeW"]);
 
+/**
+ * A rating the quote tool can work out from another field, though staff are still asked for the real one:
+ * an inverter with only its kVA figure is counted at a share of it (`inverterPowerFactor` in the quote settings).
+ */
+const QUOTE_STAND_IN: Record<string, string> = { ratedContinuousW: "ratedKva" };
+
 /** The quote tool groups inverters and batteries by brand. Panels can go with any brand. */
 const BRAND_NEEDED = new Set(["inverters", "inverter-and-battery-sets", "lithium-batteries", "tubular-batteries", "drycell-batteries"]);
 
@@ -77,7 +83,7 @@ function quoteGaps(p: QuoteCheck, blockingOnly = false): string[] {
   const specs = (typeof p.specs === "object" && p.specs !== null ? p.specs : {}) as Record<string, unknown>;
   for (const need of QUOTE_FIELDS[p.categorySlug]) {
     const keys = typeof need === "string" ? [need] : need;
-    if (blockingOnly && keys.every((k) => QUOTE_OPTIONAL.has(k))) continue;
+    if (blockingOnly && (keys.every((k) => QUOTE_OPTIONAL.has(k)) || keys.some((k) => Object.hasOwn(QUOTE_STAND_IN, k) && filled(specs[QUOTE_STAND_IN[k]])))) continue;
     if (!keys.some((k) => filled(specs[k]))) gaps.push(labelOf(keys, p.specTemplate));
   }
   return gaps;
@@ -90,6 +96,7 @@ export function missingDetails(p: MissingInput): string[] {
 
 /**
  * True when the quote tool reads this kind of product but cannot use this one yet. A photo, a price and
- * a surge rating are not needed: with no price the quote lists the product as "price on request".
+ * a surge rating are not needed (with no price the quote lists the product as "price on request"), and
+ * an inverter's kVA figure will do until its rated watts are entered.
  */
 export const lacksQuoteDetails = (p: QuoteCheck) => quoteGaps(p, true).length > 0;

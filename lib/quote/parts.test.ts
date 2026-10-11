@@ -23,8 +23,17 @@ describe("toParts", () => {
   });
 
   it("leaves out a product that is missing a rating or a brand, instead of guessing", () => {
-    expect(toParts([row({ specs: { ratedKva: 6, systemVoltage: 48 } })]).inverters).toEqual([]);
+    expect(toParts([row({ specs: { ratedKva: 6 } })]).inverters).toEqual([]);
+    expect(toParts([row({ specs: { systemVoltage: 48, type: "Hybrid" } })]).inverters).toEqual([]);
     expect(toParts([row({ brandId: null, brandName: null })]).inverters).toEqual([]);
+  });
+
+  it("counts an inverter with only a kVA figure at the usual power factor, and prefers its real watts", () => {
+    expect(toParts([row({ specs: { ratedKva: 10, systemVoltage: 48 } })]).inverters[0]).toMatchObject({ continuousW: 8000, surgeW: 8000 });
+    expect(toParts([row({ specs: { ratedKva: 10, systemVoltage: 48 } })], 1).inverters[0].continuousW).toBe(10_000);
+    expect(toParts([row({ specs: { ratedKva: 6, ratedContinuousW: 6000, systemVoltage: 48 } })]).inverters[0].continuousW).toBe(6000);
+    const [set] = toParts([row({ categorySlug: "inverter-and-battery-sets", specs: { ratedKva: 8, batteryKwh: 10 } })]).sets;
+    expect(set).toMatchObject({ continuousW: 6400, batteryWh: 10_000 });
   });
 
   it("keeps a product that has no price yet", () => {

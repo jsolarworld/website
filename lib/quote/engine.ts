@@ -10,7 +10,14 @@ import type {
 
 const CHEMISTRIES: Chemistry[] = ["lithium", "tubular"];
 
-/** PRD 7.2: what the home needs, before looking at any package. */
+/** Appliances the customer left off the system: they stay on mains or generator and are not sized for. */
+export const leftOff = (input: QuoteInput) => [...new Set(input.items.filter((i) => !i.onBackup).map((i) => i.name))];
+
+/**
+ * PRD 7.2: what the home needs, before looking at any package. Since 2026-10-11 a heavy appliance the
+ * customer leaves unticked is left out of every figure, not only the battery: counting cookers, heaters
+ * and pumps towards the inverter made an ordinary household list need more than anything in the shop.
+ */
 export function computeNeeds(input: QuoteInput, s: QuoteSettings): Needs {
   let peakW = 0;
   let largestStartupExtraW = 0;
@@ -19,15 +26,14 @@ export function computeNeeds(input: QuoteInput, s: QuoteSettings): Needs {
   let highDrawOnBackup = false;
 
   for (const item of input.items) {
+    if (!item.onBackup) continue;
     const load = item.watts * item.quantity;
     peakW += load;
     // Only one motor is assumed to start at a time, so take the largest single extra.
     largestStartupExtraW = Math.max(largestStartupExtraW, item.watts * (item.surge - 1));
     dailyWh += load * item.hoursPerDay * item.dutyCycle;
-    if (item.onBackup) {
-      backupSumW += load * item.dutyCycle;
-      if (item.highDraw) highDrawOnBackup = true;
-    }
+    backupSumW += load * item.dutyCycle;
+    if (item.highDraw) highDrawOnBackup = true;
   }
 
   const backupLoadW = backupSumW * s.diversityFactor;

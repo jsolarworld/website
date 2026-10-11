@@ -13,6 +13,7 @@ export function quoteSummary(view: QuoteView, reference?: string, url?: string):
     "J Solar World solar quote" + (reference ? ` (${reference})` : ""),
     `Load: ${Math.round(n.peakW)} W, daily use ${kwh(n.dailyWh)}, ${view.backupHours}h backup`,
   ];
+  if (view.leftOff?.length) lines.push(`Not on the system (stays on NEPA or generator): ${view.leftOff.join(", ")}`);
   for (const o of view.options) {
     lines.push(`${o.label}: ${o.name} - ${formatNaira(o.priceNgn)}`);
   }

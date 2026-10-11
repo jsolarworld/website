@@ -4,10 +4,10 @@ import { db } from "../db";
 import { effectivePrice } from "../catalogue";
 import { DEFAULT_SETTINGS } from "./defaults";
 import { QUOTE_FIELDS } from "../admin/missing";
-import { computeNeeds, matchPackages } from "./engine";
-import { toParts } from "./parts";
+import { computeNeeds, leftOff, matchPackages } from "./engine";
+import { toParts, type PartRow } from "./parts";
 import type { Contact, QuoteRequest } from "./request";
-import { buildSystems, pickPanel, tooLarge, type Parts } from "./systems";
+import { buildSystems, pickPanel, tooLarge } from "./systems";
 import type { Chemistry, QuotePackage, QuoteSettings } from "./types";
 import { buildView, type PackageMeta, type QuoteView } from "./view";
 
@@ -58,10 +58,10 @@ export async function loadPackages() {
 }
 
 /**
- * Published inverters, batteries, sets and panels with the ratings the quote tool needs, priced or not.
+ * Published inverters, batteries, sets and panels, priced or not, for `toParts` to sort.
  * Out-of-stock items are dropped here; "available on request" counts as available.
  */
-export async function loadParts(): Promise<Parts> {
+export async function loadPartRows(): Promise<PartRow[]> {
   const rows = await db.product.findMany({
     where: { kind: "PRODUCT", status: "PUBLISHED", category: { slug: { in: Object.keys(QUOTE_FIELDS) } } },
     select: {
@@ -78,24 +78,24 @@ export async function loadParts(): Promise<Parts> {
       category: { select: { slug: true } },
     },
   });
-  return toParts(
-    rows.flatMap((r) => {
-      if (!r.availableOnRequest && r.stock <= 0) return [];
-      return [{ ...r, price: effectivePrice(r), brandName: r.brand?.name ?? null, categorySlug: r.category.slug }];
-    }),
-  );
+  return rows.flatMap((r) => {
+    if (!r.availableOnRequest && r.stock <= 0) return [];
+    return [{ ...r, price: effectivePrice(r), brandName: r.brand?.name ?? null, categorySlug: r.category.slug }];
+  });
 }
 
 export async function runQuote(req: QuoteRequest, preloaded?: QuoteSettings): Promise<QuoteView> {
-  const [settings, { packages, meta }, parts] = await Promise.all([preloaded ?? loadSettings(), loadPackages(), loadParts()]);
+  const [settings, { packages, meta }, rows] = await Promise.all([preloaded ?? loadSettings(), loadPackages(), loadPartRows()]);
+  const parts = toParts(rows, settings.inverterPowerFactor);
   const needs = computeNeeds(req.input, settings);
   const result = matchPackages(needs, packages, settings, req.chemistry);
   const panel = pickPanel(parts.panels, needs.arrayW);
-  return buildView(result, req.input.backupHours, meta, req.budgetNgn, {
+  const view = buildView(result, req.input.backupHours, meta, req.budgetNgn, {
     systems: buildSystems(needs, parts, settings, req.chemistry),
     tooLarge: tooLarge(needs, settings),
     panel: panel && { name: panel.name, slug: panel.slug, watts: panel.watts },
   });
+  return { ...view, leftOff: leftOff(req.input) };
 }
 
 // No 0/O/1/I so a reference read aloud over the phone isn't misheard.

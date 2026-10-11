@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Badge, Card, CardBody, Container, Eyebrow, Notice, Panel, Price, SpecFigure, buttonClass } from "@/components/ui";
 import { BrandSystems } from "@/components/quote/brand-systems";
+import { LeftOffNotice } from "@/components/quote/left-off-notice";
 import { getSavedQuote, isExpired } from "@/lib/quote/service";
 import { quoteSummary } from "@/lib/quote/summary";
 import type { QuoteView } from "@/lib/quote/view";
@@ -49,6 +50,8 @@ export default async function SavedQuotePage({ params }: Props) {
           <SpecFigure onChassis label="Solar array" value={Math.round(n.arrayW).toLocaleString("en-NG")} unit="W" />
         </div>
       </Panel>
+
+      <LeftOffNotice names={view.leftOff} className="mt-6" />
 
       {view.options.length === 0 ? (
         systems.length === 0 && (

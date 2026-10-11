@@ -98,18 +98,13 @@ const hasPrice = <T extends { price: number | null }>(p: T): p is T & { price: n
 const byPriceThenId = <T extends { price: number; id: string }>(a: T, b: T) => a.price - b.price || a.id.localeCompare(b.id);
 
 /**
- * The cheapest, among the choices that are priced in full. One with a part that has no price yet
- * (`price` null, `known` the naira of its priced parts) is taken only when nothing is priced in full,
- * or when it is a closer fit (a smaller battery) whose known cost is still below the cheapest priced
- * one: so a right-sized battery with no price beats a priced one three times the need. Among those,
- * the smallest battery, then the smallest inverter.
+ * The cheapest, among the choices that are priced in full, so the customer sees a total whenever the
+ * brand can give one. Only when none is priced in full, the closest fit among the rest: the smallest
+ * battery, then the smallest inverter.
  */
-function choose<T extends { price: number | null; known: number; wh: number; continuousW: number; id: string }>(list: T[]): T | undefined {
+function choose<T extends { price: number | null; wh: number; continuousW: number; id: string }>(list: T[]): T | undefined {
   const priced = list.filter(hasPrice).sort(byPriceThenId)[0];
-  const open = list
-    .filter((c) => !hasPrice(c) && (!priced || (c.wh < priced.wh && c.known < priced.price)))
-    .sort((a, b) => a.wh - b.wh || a.continuousW - b.continuousW || a.id.localeCompare(b.id))[0];
-  return open ?? priced;
+  return priced ?? [...list].sort((a, b) => a.wh - b.wh || a.continuousW - b.continuousW || a.id.localeCompare(b.id))[0];
 }
 
 /**
@@ -175,7 +170,7 @@ export function buildSystems(needs: Needs, parts: Parts, s: QuoteSettings, chemi
         : choose(
             parts.sets
               .filter((p) => p.brand === brand && inStock(p, 1) && fits(p, needs) && p.batteryWh >= needs.batteryWh.lithium)
-              .map((p) => ({ ...p, wh: p.batteryWh, known: p.price ?? 0 })),
+              .map((p) => ({ ...p, wh: p.batteryWh })),
           );
     if (set) {
       options.push(
@@ -192,16 +187,15 @@ export function buildSystems(needs: Needs, parts: Parts, s: QuoteSettings, chemi
     }
 
     // Every fitting inverter with every battery model of the brand: keep the cheapest pairing.
-    const pairings: { inv: InverterPart; battery: BatteryPart; quantity: number; wh: number; price: number | null; known: number; continuousW: number; id: string }[] = [];
+    const pairings: { inv: InverterPart; battery: BatteryPart; quantity: number; wh: number; price: number | null; continuousW: number; id: string }[] = [];
     for (const inv of parts.inverters) {
       if (inv.brand !== brand || !inStock(inv, 1) || !fits(inv, needs)) continue;
       for (const battery of parts.batteries) {
         if (battery.brand !== brand || (chemistry && battery.chemistry !== chemistry)) continue;
         const b = bank(battery, inv, needs);
         if (!b) continue;
-        const known = (inv.price ?? 0) + (battery.price ?? 0) * b.quantity;
-        const price = hasPrice(inv) && hasPrice(battery) ? known : null;
-        pairings.push({ inv, battery, ...b, price, known, continuousW: inv.continuousW, id: `${inv.id}:${battery.id}` });
+        const price = hasPrice(inv) && hasPrice(battery) ? inv.price + battery.price * b.quantity : null;
+        pairings.push({ inv, battery, ...b, price, continuousW: inv.continuousW, id: `${inv.id}:${battery.id}` });
       }
     }
     const best = choose(pairings);

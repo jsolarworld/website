@@ -50,6 +50,11 @@ describe("quoteSummary", () => {
     expect(quoteSummary(view({ systems: [none] }))).toContain("Yohako: price on request (");
   });
 
+  it("names the appliances the system does not power", () => {
+    expect(quoteSummary(view({ leftOff: ["Electric kettle", "Water heater with tank"] }))).toContain("Not on the system (stays on NEPA or generator): Electric kettle, Water heater with tank");
+    expect(quoteSummary(view({ leftOff: [] }))).not.toContain("Not on the system");
+  });
+
   it("keeps the message short when many brands fit", () => {
     const systems = ["A", "B", "C", "D", "E", "F"].map((b, i) => system(b, "separate", 1_000_000 + i));
     expect(quoteSummary(view({ systems })).split("\n").filter((l) => /^[A-F]:/.test(l))).toHaveLength(4);

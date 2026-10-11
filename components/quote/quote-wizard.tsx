@@ -19,8 +19,9 @@ import {
   buttonClass,
 } from "@/components/ui";
 import { BrandSystems } from "./brand-systems";
+import { LeftOffNotice } from "./left-off-notice";
 import { saveQuoteAction } from "@/lib/quote/actions";
-import { CONSENT_ERROR, PHONE_ERROR } from "@/lib/quote/request";
+import { CONSENT_ERROR, NOTHING_ON_ERROR, PHONE_ERROR } from "@/lib/quote/request";
 import type { QuoteView } from "@/lib/quote/view";
 import { quoteSummary } from "@/lib/quote/summary";
 import { normalizeNgPhone } from "@/lib/phone";
@@ -115,10 +116,12 @@ export function QuoteWizard({ appliances }: { appliances: ApplianceOption[] }) {
     return [...lib, ...cus];
   }, [appliances, rows, custom]);
 
+  // Only what the solar system will power: a heavy appliance left unticked is not sized for.
   const totals = useMemo(() => {
     let w = 0;
     let wh = 0;
     for (const i of items) {
+      if (!i.onBackup) continue;
       w += i.watts * i.quantity;
       wh += i.watts * i.quantity * i.hoursPerDay * i.dutyCycle;
     }
@@ -126,6 +129,7 @@ export function QuoteWizard({ appliances }: { appliances: ApplianceOption[] }) {
   }, [items]);
 
   const hasHighDraw = items.some((i) => i.highDraw);
+  const anyOnSystem = items.some((i) => i.onBackup);
 
   const request = () => ({
     items,
@@ -256,7 +260,7 @@ export function QuoteWizard({ appliances }: { appliances: ApplianceOption[] }) {
                               onChange={(e) => setRow(a, { onBackup: e.target.checked })}
                               className="size-5"
                             />
-                            Run this on battery backup too (uses a lot of power)
+                            Power this from the solar system too (needs a much bigger system)
                           </label>
                         )}
                       </li>
@@ -311,14 +315,15 @@ export function QuoteWizard({ appliances }: { appliances: ApplianceOption[] }) {
               </div>
               {hasHighDraw && (
                 <p className="mt-4 text-sm text-on-chassis-muted">
-                  Heating appliances use a lot of power. We leave them off battery backup unless you tick the box.
+                  Cookers, heaters and big pumps use a lot of power. We leave them on NEPA or generator, outside the solar system, unless you tick the
+                  box.
                 </p>
               )}
               <Button
                 variant="primary"
                 block
                 className="mt-5"
-                disabled={items.length === 0}
+                disabled={!anyOnSystem}
                 onClick={() => {
                   setError(null);
                   setStep(2);
@@ -327,7 +332,7 @@ export function QuoteWizard({ appliances }: { appliances: ApplianceOption[] }) {
               >
                 Next: backup needs
               </Button>
-              {items.length === 0 && <p className="mt-2 text-xs text-on-chassis-muted">Pick at least one appliance.</p>}
+              {!anyOnSystem && <p className="mt-2 text-xs text-on-chassis-muted">{items.length === 0 ? "Pick at least one appliance." : `${NOTHING_ON_ERROR}.`}</p>}
             </Panel>
           </aside>
         </div>
@@ -472,9 +477,11 @@ function Results({
         </div>
       </Panel>
 
+      <LeftOffNotice names={view.leftOff} canChange />
+
       {n.highDrawOnBackup && (
         <Notice tone="warning" title="An engineer will check this one">
-          Your list has heavy appliances running on battery. We&apos;ll confirm the right system with you.
+          Your list has heavy appliances running on the system. We&apos;ll confirm the right system with you.
         </Notice>
       )}
 

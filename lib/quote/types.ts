@@ -9,7 +9,7 @@ export interface Appliance {
   dutyCycle: number;
   /** Start-up draw multiplier for motor loads. */
   surge: number;
-  /** Heavy loads (heaters, big pumps) that should usually stay off battery backup. */
+  /** Heavy loads (heaters, cookers, big pumps) that start off the solar system: see `QuoteItem.onBackup`. */
   highDraw: boolean;
 }
 
@@ -22,7 +22,10 @@ export interface QuoteItem {
   dutyCycle: number;
   surge: number;
   highDraw: boolean;
-  /** Whether this item must run from the battery during an outage. */
+  /**
+   * Whether the system powers this item, battery included. False only for a heavy appliance the customer
+   * left unticked: it stays on mains or generator and no figure is sized for it.
+   */
   onBackup: boolean;
 }
 
@@ -46,6 +49,8 @@ export interface QuoteSettings {
   autoSizeLimitW: number;
   /** A system put together from single products gets at least this many panel watts per Wh of its own battery. */
   panelWPerBatteryWh: number;
+  /** Watts per VA an inverter is counted at when the catalogue has its kVA figure but not its rated watts. */
+  inverterPowerFactor: number;
 }
 
 export interface Needs {

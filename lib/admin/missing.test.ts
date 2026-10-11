@@ -54,6 +54,13 @@ describe("missingDetails", () => {
     expect(lacksQuoteDetails(product({ specs: { surgeW: 12000, systemVoltage: 48 } }))).toBe(true);
   });
 
+  it("lets the quote tool use an inverter that has only its kVA figure, and still asks for the watts", () => {
+    const kvaOnly = product({ specs: { ratedKva: 6, systemVoltage: 48 } });
+    expect(lacksQuoteDetails(kvaOnly)).toBe(false);
+    expect(missingDetails(kvaOnly)).toEqual(["rated continuous power (W)", "surge power (W)"]);
+    expect(lacksQuoteDetails(product({ specs: { ratedKva: 6 } }))).toBe(true);
+  });
+
   it("treats an empty or zero rating as missing", () => {
     expect(missingDetails(product({ specs: { ratedContinuousW: 0, surgeW: "", systemVoltage: 48 } }))).toEqual(["rated continuous power (W)", "surge power (W)"]);
   });

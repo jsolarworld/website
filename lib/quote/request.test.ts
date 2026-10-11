@@ -20,6 +20,7 @@ describe("parseQuoteRequest", () => {
     ["hours over 24", { ...base, items: [{ ...item, hoursPerDay: 30 }] }],
     ["NaN watts", { ...base, items: [{ ...item, watts: NaN }] }],
     ["bad backup hours", { ...base, backupHours: 0 }],
+    ["nothing left on the system", { ...base, items: [{ ...item, highDraw: true, onBackup: false }] }],
   ])("rejects %s", (_name, raw) => {
     expect(parseQuoteRequest(raw).ok).toBe(false);
   });

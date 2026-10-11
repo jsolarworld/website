@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { APPLIANCES, itemFromAppliance } from "./appliances";
 import { DEFAULT_SETTINGS } from "./defaults";
-import { backupHoursFor, computeNeeds, matchPackages, quote } from "./engine";
+import { backupHoursFor, computeNeeds, leftOff, matchPackages, quote } from "./engine";
 import type { QuoteInput, QuotePackage } from "./types";
 
 const byId = (id: string) => APPLIANCES.find((a) => a.id === id)!;
@@ -62,9 +62,34 @@ describe("computeNeeds (PRD 7.4 worked example)", () => {
 
 describe("array need", () => {
   it("covers everything running at once in full sun when that is more than a day's energy asks for", () => {
-    // A 1,500 W kettle for 15 minutes: 375 Wh a day needs only 125 W of panels, but running it needs 1,500 / 0.75.
-    const n = computeNeeds({ backupHours: 8, items: [itemFromAppliance(byId("electric-kettle"), 1, 0.25)] }, DEFAULT_SETTINGS);
+    // A 1,500 W kettle (ticked, so the system powers it) for 15 minutes: 375 Wh a day needs only 125 W of
+    // panels, but running it needs 1,500 / 0.75.
+    const n = computeNeeds({ backupHours: 8, items: [itemFromAppliance(byId("electric-kettle"), 1, 0.25, true)] }, DEFAULT_SETTINGS);
     expect(n.arrayW).toBeCloseTo(2000);
+  });
+});
+
+describe("appliances left off the system", () => {
+  const heater = itemFromAppliance(byId("water-heater"), 1, 2);
+  const pump = itemFromAppliance(byId("water-pump-1-5hp"), 1, 1);
+
+  it("are left out of every figure, so the home is sized as if they were not listed", () => {
+    expect([heater.onBackup, pump.onBackup]).toEqual([false, false]);
+    const withThem = computeNeeds({ ...flat, items: [...flat.items, heater, pump] }, DEFAULT_SETTINGS);
+    expect(withThem).toEqual(computeNeeds(flat, DEFAULT_SETTINGS));
+  });
+
+  it("count in full once the customer ticks them", () => {
+    const ticked = computeNeeds({ ...flat, items: [...flat.items, { ...pump, onBackup: true }] }, DEFAULT_SETTINGS);
+    expect(ticked.peakW).toBe(535 + 1500);
+    // The pump's start-up (four times its running watts) is now the largest.
+    expect(ticked.surgeW).toBe(535 + 1500 + 4500);
+    expect(ticked.highDrawOnBackup).toBe(true);
+  });
+
+  it("are named once each, for the quote to say they stay on mains", () => {
+    expect(leftOff({ ...flat, items: [...flat.items, heater, pump, heater] })).toEqual(["Water heater with tank", "Water pump, 1.5 HP"]);
+    expect(leftOff(flat)).toEqual([]);
   });
 });
 
@@ -96,7 +121,7 @@ describe("surge uses the single largest motor start-up", () => {
 });
 
 describe("high-draw items", () => {
-  it("default off backup and do not flag review", () => {
+  it("start off the system and do not flag review", () => {
     const item = itemFromAppliance(byId("electric-kettle"), 1, 1);
     expect(item.onBackup).toBe(false);
     const n = computeNeeds({ backupHours: 8, items: [item] }, DEFAULT_SETTINGS);
