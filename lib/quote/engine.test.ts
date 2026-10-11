@@ -60,6 +60,14 @@ describe("computeNeeds (PRD 7.4 worked example)", () => {
   });
 });
 
+describe("array need", () => {
+  it("covers everything running at once in full sun when that is more than a day's energy asks for", () => {
+    // A 1,500 W kettle for 15 minutes: 375 Wh a day needs only 125 W of panels, but running it needs 1,500 / 0.75.
+    const n = computeNeeds({ backupHours: 8, items: [itemFromAppliance(byId("electric-kettle"), 1, 0.25)] }, DEFAULT_SETTINGS);
+    expect(n.arrayW).toBeCloseTo(2000);
+  });
+});
+
 describe("backupHoursFor", () => {
   it("gives about 11.5 h for a 5 kWh lithium package", () => {
     const n = computeNeeds(flat, DEFAULT_SETTINGS);

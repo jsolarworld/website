@@ -86,11 +86,15 @@ export function parseQuoteRequest(raw: unknown): Result<QuoteRequest> {
   };
 }
 
+// Shared with the wizard, which shows them under the field before anything is sent.
+export const PHONE_ERROR = "Enter a valid Nigerian phone number, e.g. 0803 123 4567";
+export const CONSENT_ERROR = "Please tick the box so we can contact you about this quote";
+
 export function parseContact(raw: unknown): Result<Contact> {
   if (!isObj(raw)) return { ok: false, error: "Invalid request" };
   const phone = typeof raw.phone === "string" ? normalizeNgPhone(raw.phone) : null;
-  if (!phone) return { ok: false, error: "Enter a valid Nigerian phone number, e.g. 0803 123 4567" };
-  if (raw.consent !== true) return { ok: false, error: "Please tick the box so we can contact you about this quote" };
+  if (!phone) return { ok: false, error: PHONE_ERROR };
+  if (raw.consent !== true) return { ok: false, error: CONSENT_ERROR };
   const email = str(raw.email, 120);
   if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { ok: false, error: "That email address doesn't look right" };
   return { ok: true, data: { phone, name: str(raw.name, 80), email, consent: true } };

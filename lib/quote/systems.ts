@@ -3,17 +3,20 @@ import type { Chemistry, Needs, QuoteSettings } from "./types";
 /**
  * Systems put together from single catalogue products, one brand at a time (owner decisions, 2026-10-03):
  * an inverter is only ever paired with its own brand's batteries, panels are counted with the cheapest
- * panel per watt, and cables, breakers and mounting are priced after a site visit, never guessed.
+ * panel per watt (enough for the home and to refill the system's own battery), and cables, breakers and
+ * mounting are priced after a site visit, never guessed.
  * Unlike an approved package, nobody has checked these parts together, so every one is shown as
  * "an engineer confirms before installation".
+ * A product with no price yet still takes part (decided 2026-10-11): it is listed as "price on request"
+ * and left out of the total.
  */
 
 interface Part {
   id: string;
   name: string;
   slug: string;
-  /** Naira, each. */
-  price: number;
+  /** Naira, each. Null when the product has no price yet. */
+  price: number | null;
   /** Units in the shop; null when it is supplied on request. */
   stock: number | null;
 }
@@ -52,7 +55,8 @@ export interface SystemLine {
   name: string;
   slug: string;
   quantity: number;
-  unitPriceNgn: number;
+  /** Null when the product has no price yet. */
+  unitPriceNgn: number | null;
 }
 
 export interface SystemOption {
@@ -62,7 +66,10 @@ export interface SystemOption {
   kind: "set" | "separate";
   chemistry: Chemistry;
   lines: SystemLine[];
-  /** Equipment only: inverter, batteries and panels. Installation materials are priced after a site visit. */
+  /**
+   * Equipment only: inverter, batteries and panels, counting the lines that have a price (see `fullyPriced`).
+   * Installation materials are priced after a site visit.
+   */
   totalNgn: number;
   inverterContinuousW: number;
   batteryWh: number;
@@ -83,14 +90,36 @@ export function voltageClass(v: number): 12 | 24 | 48 | null {
 
 export const tooLarge = (needs: Needs, s: QuoteSettings) => needs.inverterContinuousW > s.autoSizeLimitW;
 
+/** False when a line has no price yet, so the total is only part of the cost. */
+export const fullyPriced = (o: { lines: { unitPriceNgn: number | null }[] }) => o.lines.every((l) => l.unitPriceNgn != null);
+
 const inStock = (p: Part, quantity: number) => p.stock == null || p.stock >= quantity;
+const hasPrice = <T extends { price: number | null }>(p: T): p is T & { price: number } => p.price != null;
 const byPriceThenId = <T extends { price: number; id: string }>(a: T, b: T) => a.price - b.price || a.id.localeCompare(b.id);
 
-/** The panel used for counting: cheapest per watt that the shop can supply enough of. */
+/**
+ * The cheapest, among the choices that are priced in full. One with a part that has no price yet
+ * (`price` null, `known` the naira of its priced parts) is taken only when nothing is priced in full,
+ * or when it is a closer fit (a smaller battery) whose known cost is still below the cheapest priced
+ * one: so a right-sized battery with no price beats a priced one three times the need. Among those,
+ * the smallest battery, then the smallest inverter.
+ */
+function choose<T extends { price: number | null; known: number; wh: number; continuousW: number; id: string }>(list: T[]): T | undefined {
+  const priced = list.filter(hasPrice).sort(byPriceThenId)[0];
+  const open = list
+    .filter((c) => !hasPrice(c) && (!priced || (c.wh < priced.wh && c.known < priced.price)))
+    .sort((a, b) => a.wh - b.wh || a.continuousW - b.continuousW || a.id.localeCompare(b.id))[0];
+  return open ?? priced;
+}
+
+/**
+ * The panel used for counting: cheapest per watt that the shop can supply enough of. When no panel
+ * has a price, the biggest one, so there are fewest to mount.
+ */
 export function pickPanel(panels: PanelPart[], arrayW: number): PanelPart | null {
   const usable = panels.filter((p) => p.watts > 0 && inStock(p, Math.ceil(arrayW / p.watts)));
-  usable.sort((a, b) => a.price / a.watts - b.price / b.watts || a.id.localeCompare(b.id));
-  return usable[0] ?? null;
+  const priced = usable.filter(hasPrice).sort((a, b) => a.price / a.watts - b.price / b.watts || a.id.localeCompare(b.id));
+  return priced[0] ?? usable.sort((a, b) => b.watts - a.watts || a.id.localeCompare(b.id))[0] ?? null;
 }
 
 /** How many of one battery model this inverter needs, or null when the two cannot be used together. */
@@ -112,22 +141,25 @@ const fits = (p: { continuousW: number; surgeW: number }, needs: Needs) => p.con
 
 /**
  * Up to two systems per brand that cover the whole need: its cheapest fitting set, and its cheapest
- * inverter-plus-batteries pairing. Cheapest first. Empty when the load is above the site-visit limit.
+ * inverter-plus-batteries pairing (see `choose` for parts with no price). Fully priced systems come
+ * first, cheapest first. Empty when the load is above the site-visit limit.
  */
 export function buildSystems(needs: Needs, parts: Parts, s: QuoteSettings, chemistry?: Chemistry): SystemOption[] {
   if (tooLarge(needs, s)) return [];
 
-  const panel = pickPanel(parts.panels, needs.arrayW);
-  const panelLines: SystemLine[] = panel
-    ? [{ role: "panel", name: panel.name, slug: panel.slug, quantity: Math.ceil(needs.arrayW / panel.watts), unitPriceNgn: panel.price }]
-    : [];
-
   const finish = (o: Omit<SystemOption, "totalNgn" | "backupHours">): SystemOption => {
+    // A battery bigger than the home's need gets more panels than the home's need, so it still refills in about a day.
+    const arrayW = Math.max(needs.arrayW, o.batteryWh * s.panelWPerBatteryWh);
+    const panel = pickPanel(parts.panels, arrayW);
+    const panelLines: SystemLine[] = panel
+      ? [{ role: "panel", name: panel.name, slug: panel.slug, quantity: Math.ceil(arrayW / panel.watts), unitPriceNgn: panel.price }]
+      : [];
+
     const lines = [...o.lines, ...panelLines];
     return {
       ...o,
       lines,
-      totalNgn: lines.reduce((sum, l) => sum + l.unitPriceNgn * l.quantity, 0),
+      totalNgn: lines.reduce((sum, l) => sum + (l.unitPriceNgn ?? 0) * l.quantity, 0),
       backupHours: needs.backupLoadW > 0 ? (o.batteryWh * s.depthOfDischarge[o.chemistry] * s.inverterEfficiency) / needs.backupLoadW : null,
     };
   };
@@ -140,9 +172,11 @@ export function buildSystems(needs: Needs, parts: Parts, s: QuoteSettings, chemi
     const set =
       chemistry === "tubular"
         ? undefined
-        : parts.sets
-            .filter((p) => p.brand === brand && inStock(p, 1) && fits(p, needs) && p.batteryWh >= needs.batteryWh.lithium)
-            .sort(byPriceThenId)[0];
+        : choose(
+            parts.sets
+              .filter((p) => p.brand === brand && inStock(p, 1) && fits(p, needs) && p.batteryWh >= needs.batteryWh.lithium)
+              .map((p) => ({ ...p, wh: p.batteryWh, known: p.price ?? 0 })),
+          );
     if (set) {
       options.push(
         finish({
@@ -158,17 +192,19 @@ export function buildSystems(needs: Needs, parts: Parts, s: QuoteSettings, chemi
     }
 
     // Every fitting inverter with every battery model of the brand: keep the cheapest pairing.
-    let best: { inv: InverterPart; battery: BatteryPart; quantity: number; wh: number; price: number; id: string } | undefined;
+    const pairings: { inv: InverterPart; battery: BatteryPart; quantity: number; wh: number; price: number | null; known: number; continuousW: number; id: string }[] = [];
     for (const inv of parts.inverters) {
       if (inv.brand !== brand || !inStock(inv, 1) || !fits(inv, needs)) continue;
       for (const battery of parts.batteries) {
         if (battery.brand !== brand || (chemistry && battery.chemistry !== chemistry)) continue;
         const b = bank(battery, inv, needs);
         if (!b) continue;
-        const candidate = { inv, battery, ...b, price: inv.price + battery.price * b.quantity, id: `${inv.id}:${battery.id}` };
-        if (!best || byPriceThenId(candidate, best) < 0) best = candidate;
+        const known = (inv.price ?? 0) + (battery.price ?? 0) * b.quantity;
+        const price = hasPrice(inv) && hasPrice(battery) ? known : null;
+        pairings.push({ inv, battery, ...b, price, known, continuousW: inv.continuousW, id: `${inv.id}:${battery.id}` });
       }
     }
+    const best = choose(pairings);
     if (best) {
       options.push(
         finish({
@@ -187,5 +223,7 @@ export function buildSystems(needs: Needs, parts: Parts, s: QuoteSettings, chemi
     }
   }
 
-  return options.sort((a, b) => a.totalNgn - b.totalNgn || a.id.localeCompare(b.id));
+  // A system waiting for a price has no total to compare, so those follow the priced ones, by brand.
+  const rank = (o: SystemOption) => (fullyPriced(o) ? 0 : 1);
+  return options.sort((a, b) => rank(a) - rank(b) || (rank(a) === 0 ? a.totalNgn - b.totalNgn : 0) || a.id.localeCompare(b.id));
 }

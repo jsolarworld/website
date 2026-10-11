@@ -1,4 +1,5 @@
 import { formatNaira } from "../site";
+import { fullyPriced } from "./systems";
 import type { QuoteView } from "./view";
 
 const kwh = (wh: number) => `${(wh / 1000).toFixed(1)} kWh`;
@@ -20,7 +21,8 @@ export function quoteSummary(view: QuoteView, reference?: string, url?: string):
   const brands = [...new Set(systems.map((o) => o.brand))].slice(0, MAX_BRANDS);
   for (const brand of brands) {
     const o = systems.find((x) => x.brand === brand)!;
-    lines.push(`${brand}: ${formatNaira(o.totalNgn)} (${o.lines.map((l) => `${l.quantity} x ${l.name}`).join(", ")})`);
+    const price = fullyPriced(o) ? formatNaira(o.totalNgn) : o.totalNgn > 0 ? `${formatNaira(o.totalNgn)} plus items priced on request` : "price on request";
+    lines.push(`${brand}: ${price} (${o.lines.map((l) => `${l.quantity} x ${l.name}`).join(", ")})`);
   }
   if (brands.length > 0) lines.push("Cables, breakers and mounting are priced after a site visit.");
   if (view.options.length === 0 && systems.length === 0) lines.push("Next step: site inspection to size your system.");

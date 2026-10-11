@@ -12,6 +12,8 @@ export const DEFAULT_SETTINGS: QuoteSettings = {
   quoteValidityDays: 7,
   // Owner decision (2026-10-03): big systems are planned on site. 15 kW is a starting figure for him to confirm.
   autoSizeLimitW: 15_000,
+  // Decided 2026-10-11: at 4 sun hours this refills a system's own battery in about a day. Engineers confirm.
+  panelWPerBatteryWh: 0.3,
 };
 
 export const DEFAULT_BACKUP_HOURS = 12;

@@ -44,6 +44,8 @@ export interface QuoteSettings {
   quoteValidityDays: number;
   /** Above this inverter need (continuous watts) no products are offered: the customer is sent to a site visit. */
   autoSizeLimitW: number;
+  /** A system put together from single products gets at least this many panel watts per Wh of its own battery. */
+  panelWPerBatteryWh: number;
 }
 
 export interface Needs {

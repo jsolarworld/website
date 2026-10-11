@@ -19,9 +19,11 @@ import {
   buttonClass,
 } from "@/components/ui";
 import { BrandSystems } from "./brand-systems";
-import { calculateQuote, saveQuoteAction } from "@/lib/quote/actions";
+import { saveQuoteAction } from "@/lib/quote/actions";
+import { CONSENT_ERROR, PHONE_ERROR } from "@/lib/quote/request";
 import type { QuoteView } from "@/lib/quote/view";
 import { quoteSummary } from "@/lib/quote/summary";
+import { normalizeNgPhone } from "@/lib/phone";
 import { SITE, whatsappLink } from "@/lib/site";
 
 export interface ApplianceOption {
@@ -85,8 +87,12 @@ export function QuoteWizard({ appliances }: { appliances: ApplianceOption[] }) {
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
+  // The phone number is compulsory: the quote is saved against it as a lead before any result is shown.
   const [contact, setContact] = useState({ name: "", phone: "", email: "", consent: false, website: "" });
+  const [contactError, setContactError] = useState<{ phone?: string; consent?: string }>({});
   const [saved, setSaved] = useState<string | null>(null);
+  // The answers the quote on screen was saved from, so going back and forth without a change saves nothing new.
+  const [savedFrom, setSavedFrom] = useState<string | null>(null);
 
   const grouped = useMemo(() => {
     const m = new Map<string, ApplianceOption[]>();
@@ -145,33 +151,36 @@ export function QuoteWizard({ appliances }: { appliances: ApplianceOption[] }) {
 
   function goToResults() {
     setError(null);
-    startTransition(async () => {
-      const res = await calculateQuote(request());
-      if (!res.ok) {
-        setError(res.error);
-        return;
-      }
-      setView(res.view);
-      setSaved(null);
+    const problems = {
+      phone: normalizeNgPhone(contact.phone) ? undefined : PHONE_ERROR,
+      consent: contact.consent ? undefined : CONSENT_ERROR,
+    };
+    setContactError(problems);
+    if (problems.phone || problems.consent) return;
+
+    const details = { name: contact.name, phone: contact.phone, email: contact.email, consent: contact.consent };
+    const answers = JSON.stringify([request(), details]);
+    if (view && saved && answers === savedFrom) {
       setStep(3);
+      window.scrollTo({ top: 0 });
+      return;
+    }
+
+    startTransition(async () => {
+      const res = await saveQuoteAction(request(), details, contact.website);
+      if (res.ok) {
+        setView(res.view);
+        setSaved(res.reference);
+        setSavedFrom(answers);
+        setStep(3);
+      } else {
+        setError(res.error);
+      }
       window.scrollTo({ top: 0 });
     });
   }
 
-  function save() {
-    setError(null);
-    startTransition(async () => {
-      const res = await saveQuoteAction(
-        request(),
-        { name: contact.name, phone: contact.phone, email: contact.email, consent: contact.consent },
-        contact.website,
-      );
-      if (!res.ok) setError(res.error);
-      else setSaved(res.reference);
-    });
-  }
-
-  const stepLabels = ["Appliances", "Backup", "Your options"];
+  const stepLabels = ["Appliances", "Your details", "Your quote"];
 
   return (
     <Container className="py-10 sm:py-14">
@@ -325,7 +334,14 @@ export function QuoteWizard({ appliances }: { appliances: ApplianceOption[] }) {
       )}
 
       {step === 2 && (
-        <div className="max-w-2xl space-y-6">
+        <form
+          className="max-w-2xl space-y-6"
+          noValidate
+          onSubmit={(e) => {
+            e.preventDefault();
+            goToResults();
+          }}
+        >
           <div>
             <Eyebrow>How long should the lights stay on when NEPA is off?</Eyebrow>
             <div className="mt-3 grid gap-3 sm:grid-cols-3">
@@ -366,48 +382,74 @@ export function QuoteWizard({ appliances }: { appliances: ApplianceOption[] }) {
             {(f) => <Input {...f} type="number" inputMode="numeric" value={budget} onChange={(e) => setBudget(e.target.value)} placeholder="2000000" />}
           </Field>
 
+          <div className="space-y-4 border-t border-line pt-6">
+            <div>
+              <Eyebrow>Where do we reach you?</Eyebrow>
+              <p className="mt-1 text-sm text-muted">We need your phone number to prepare your quote. We save the quote under it so our team can follow up.</p>
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field name="phone" label="WhatsApp phone number" hint="e.g. 0803 123 4567" error={contactError.phone}>
+                {(f) => <Input {...f} type="tel" inputMode="tel" autoComplete="tel" value={contact.phone} onChange={(e) => setContact({ ...contact, phone: e.target.value })} />}
+              </Field>
+              <Field name="name" label="Your name" required={false}>
+                {(f) => <Input {...f} autoComplete="name" value={contact.name} onChange={(e) => setContact({ ...contact, name: e.target.value })} />}
+              </Field>
+              <Field name="email" label="Email" required={false} className="sm:col-span-2">
+                {(f) => <Input {...f} type="email" autoComplete="email" value={contact.email} onChange={(e) => setContact({ ...contact, email: e.target.value })} />}
+              </Field>
+            </div>
+            {/* Honeypot: hidden from people, filled by bots. */}
+            <div aria-hidden className="absolute -left-[9999px] h-0 w-0 overflow-hidden">
+              <label>
+                Website
+                <input tabIndex={-1} autoComplete="off" value={contact.website} onChange={(e) => setContact({ ...contact, website: e.target.value })} />
+              </label>
+            </div>
+            <div>
+              <label className="flex items-start gap-3 text-sm">
+                <input
+                  type="checkbox"
+                  className="mt-0.5 size-5"
+                  checked={contact.consent}
+                  aria-describedby={contactError.consent ? "consent-error" : undefined}
+                  onChange={(e) => setContact({ ...contact, consent: e.target.checked })}
+                />
+                <span>Yes, J Solar World may call or message me about this quote.</span>
+              </label>
+              {contactError.consent && (
+                <p id="consent-error" className="mt-1.5 text-xs text-alert-700">
+                  {contactError.consent}
+                </p>
+              )}
+            </div>
+          </div>
+
           <div className="flex gap-3">
             <Button variant="outline" onClick={() => setStep(1)}>Back</Button>
-            <Button variant="primary" onClick={goToResults} disabled={pending}>
-              {pending ? "Working it out…" : "Show my options"}
+            <Button type="submit" variant="primary" disabled={pending}>
+              {pending ? "Working it out…" : "Show my quote"}
             </Button>
           </div>
-        </div>
+        </form>
       )}
 
-      {step === 3 && view && (
-        <Results
-          view={view}
-          chemistry={chemistry}
-          saved={saved}
-          contact={contact}
-          setContact={setContact}
-          onSave={save}
-          pending={pending}
-          onBack={() => setStep(2)}
-        />
-      )}
+      {step === 3 && view && saved && <Results view={view} chemistry={chemistry} saved={saved} phone={contact.phone} onBack={() => setStep(2)} />}
     </Container>
   );
 }
 
+/** The quote is already saved by the time this is shown: `saved` is its number. */
 function Results({
   view,
   chemistry,
   saved,
-  contact,
-  setContact,
-  onSave,
-  pending,
+  phone,
   onBack,
 }: {
   view: QuoteView;
   chemistry: "" | "lithium" | "tubular";
-  saved: string | null;
-  contact: { name: string; phone: string; email: string; consent: boolean; website: string };
-  setContact: (c: { name: string; phone: string; email: string; consent: boolean; website: string }) => void;
-  onSave: () => void;
-  pending: boolean;
+  saved: string;
+  phone: string;
   onBack: () => void;
 }) {
   const n = view.needs;
@@ -416,8 +458,7 @@ function Results({
   const panels = Math.ceil(n.arrayW / panelW);
   const battery =
     chemistry === "" ? `${kwh(n.batteryWh.lithium)} kWh lithium or ${kwh(n.batteryWh.tubular)} kWh tubular` : `${kwh(n.batteryWh[chemistry])} kWh ${chemistry}`;
-  const url = saved ? `${SITE.url}/solar-quote/${saved}` : undefined;
-  const summary = quoteSummary(view, saved ?? undefined, url);
+  const summary = quoteSummary(view, saved, `${SITE.url}/solar-quote/${saved}`);
 
   return (
     <div className="space-y-8">
@@ -444,8 +485,8 @@ function Results({
               <h2 className="text-title">{view.tooLarge ? "This is a big system. Let's plan it on site" : "Let's size this properly"}</h2>
               <p className="mt-2 text-muted">
                 {view.tooLarge
-                  ? "A load this size needs a system designed by our engineer, so we don't show ready prices for it. Save your quote below and we'll call you to arrange a site inspection."
-                  : "We don't have a ready system that covers everything you listed. Save your quote below and our engineer will call you to plan one, or book a site inspection."}
+                  ? "A load this size needs a system designed by our engineer, so we don't show ready prices for it. We have saved your quote and will call you to arrange a site inspection."
+                  : "We don't have a ready system that covers everything you listed. We have saved your quote and our engineer will call you to plan one."}
               </p>
             </CardBody>
           </Card>
@@ -483,7 +524,7 @@ function Results({
                   {o.slug && <Link href={`/products/${o.slug}`} className={buttonClass({ variant: "outline", size: "sm" })}>See package</Link>}
                   <a
                     className={buttonClass({ variant: "outline", size: "sm" })}
-                    href={whatsappLink(`Hello ${SITE.shortName}, I'd like the ${o.name} from my quote${saved ? ` (${saved})` : ""}.`)}
+                    href={whatsappLink(`Hello ${SITE.shortName}, I'd like the ${o.name} from my quote (${saved}).`)}
                     target="_blank"
                     rel="noopener noreferrer"
                   >
@@ -496,71 +537,24 @@ function Results({
         </div>
       )}
 
-      <BrandSystems systems={systems} reference={saved ?? undefined} />
+      <BrandSystems systems={systems} reference={saved} />
 
-      {saved ? (
-        <Card>
-          <CardBody className="space-y-4">
-            <Notice tone="positive" title={`Saved. Your quote number is ${saved}`}>
-              We&apos;ll be in touch on {contact.phone}. Keep this number, it is valid for 7 days.
-            </Notice>
-            <div className="flex flex-wrap gap-3">
-              <Link href={`/solar-quote/${saved}`} className={buttonClass({ variant: "primary" })}>Open my saved quote</Link>
-              <a className={buttonClass({ variant: "outline" })} href={`https://wa.me/?text=${encodeURIComponent(summary)}`} target="_blank" rel="noopener noreferrer">
-                Share on WhatsApp
-              </a>
-              <a className={buttonClass({ variant: "outline" })} href={whatsappLink(`Hello ${SITE.shortName}, about my quote ${saved}`)} target="_blank" rel="noopener noreferrer">
-                Chat with us about it
-              </a>
-            </div>
-          </CardBody>
-        </Card>
-      ) : (
-        <Card>
-          <CardBody>
-            <h2 className="text-title">Save this quote</h2>
-            <p className="mt-1 text-sm text-muted">Enter your number to save it, send it to family, and let us follow up.</p>
-            <form
-              className="mt-5 grid gap-4 sm:grid-cols-2"
-              onSubmit={(e) => {
-                e.preventDefault();
-                onSave();
-              }}
-            >
-              <Field name="phone" label="WhatsApp phone number" hint="e.g. 0803 123 4567">
-                {(f) => <Input {...f} type="tel" inputMode="tel" autoComplete="tel" value={contact.phone} onChange={(e) => setContact({ ...contact, phone: e.target.value })} />}
-              </Field>
-              <Field name="name" label="Your name" required={false}>
-                {(f) => <Input {...f} autoComplete="name" value={contact.name} onChange={(e) => setContact({ ...contact, name: e.target.value })} />}
-              </Field>
-              <Field name="email" label="Email" required={false} className="sm:col-span-2">
-                {(f) => <Input {...f} type="email" autoComplete="email" value={contact.email} onChange={(e) => setContact({ ...contact, email: e.target.value })} />}
-              </Field>
-              {/* Honeypot: hidden from people, filled by bots. */}
-              <div aria-hidden className="absolute -left-[9999px] h-0 w-0 overflow-hidden">
-                <label>
-                  Website
-                  <input tabIndex={-1} autoComplete="off" value={contact.website} onChange={(e) => setContact({ ...contact, website: e.target.value })} />
-                </label>
-              </div>
-              <label className="flex items-start gap-3 text-sm sm:col-span-2">
-                <input
-                  type="checkbox"
-                  className="mt-0.5 size-5"
-                  checked={contact.consent}
-                  onChange={(e) => setContact({ ...contact, consent: e.target.checked })}
-                />
-                <span>Yes, J Solar World may call or message me about this quote.</span>
-              </label>
-              <div className="sm:col-span-2">
-                <Button type="submit" variant="primary" disabled={pending}>
-                  {pending ? "Saving…" : "Save my quote"}
-                </Button>
-              </div>
-            </form>
-          </CardBody>
-        </Card>
-      )}
+      <Card>
+        <CardBody className="space-y-4">
+          <Notice tone="positive" title={`Saved. Your quote number is ${saved}`}>
+            We&apos;ll be in touch on {phone}. Keep this number, it is valid for 7 days.
+          </Notice>
+          <div className="flex flex-wrap gap-3">
+            <Link href={`/solar-quote/${saved}`} className={buttonClass({ variant: "primary" })}>Open my saved quote</Link>
+            <a className={buttonClass({ variant: "outline" })} href={`https://wa.me/?text=${encodeURIComponent(summary)}`} target="_blank" rel="noopener noreferrer">
+              Share on WhatsApp
+            </a>
+            <a className={buttonClass({ variant: "outline" })} href={whatsappLink(`Hello ${SITE.shortName}, about my quote ${saved}`)} target="_blank" rel="noopener noreferrer">
+              Chat with us about it
+            </a>
+          </div>
+        </CardBody>
+      </Card>
 
       <p className="text-sm text-muted">
         This is an estimate. The final design and price are confirmed after a site inspection by our engineers.

@@ -18,6 +18,12 @@ export const QUOTE_FIELDS: Record<string, (string | string[])[]> = {
   "solar-panels": ["watts"],
 };
 
+/**
+ * Ratings the quote tool can work without, though staff are still asked for them: with no surge
+ * rating it counts on the continuous rating alone, so the inverter is offered for fewer homes.
+ */
+const QUOTE_OPTIONAL = new Set(["surgeW"]);
+
 /** The quote tool groups inverters and batteries by brand. Panels can go with any brand. */
 const BRAND_NEEDED = new Set(["inverters", "inverter-and-battery-sets", "lithium-batteries", "tubular-batteries", "drycell-batteries"]);
 
@@ -60,14 +66,18 @@ function labelOf(keys: string[], template: SpecField[]): string {
   return `${label.charAt(0).toLowerCase()}${label.slice(1)}${units.length ? ` (${units.join(" or ")})` : ""}`;
 }
 
-/** Brand and ratings the quote tool needs but cannot find. Empty when it does not read this kind of product. */
-function quoteGaps(p: QuoteCheck): string[] {
+/**
+ * Brand and ratings the quote tool reads but cannot find. Empty when it does not read this kind of product.
+ * `blockingOnly` leaves out the ratings it can work without.
+ */
+function quoteGaps(p: QuoteCheck, blockingOnly = false): string[] {
   if (!usedByQuoteTool(p)) return [];
   const gaps: string[] = [];
   if (brandNeeded(p.categorySlug) && !p.brandId) gaps.push("brand");
   const specs = (typeof p.specs === "object" && p.specs !== null ? p.specs : {}) as Record<string, unknown>;
   for (const need of QUOTE_FIELDS[p.categorySlug]) {
     const keys = typeof need === "string" ? [need] : need;
+    if (blockingOnly && keys.every((k) => QUOTE_OPTIONAL.has(k))) continue;
     if (!keys.some((k) => filled(specs[k]))) gaps.push(labelOf(keys, p.specTemplate));
   }
   return gaps;
@@ -78,5 +88,8 @@ export function missingDetails(p: MissingInput): string[] {
   return [...(p.priceNgn == null ? ["price"] : []), ...(p.mediaCount === 0 ? ["photo"] : []), ...quoteGaps(p)];
 }
 
-/** True when the quote tool reads this kind of product but cannot use this one yet (a photo is not needed). */
-export const lacksQuoteDetails = (p: QuoteCheck) => usedByQuoteTool(p) && (p.priceNgn == null || quoteGaps(p).length > 0);
+/**
+ * True when the quote tool reads this kind of product but cannot use this one yet. A photo, a price and
+ * a surge rating are not needed: with no price the quote lists the product as "price on request".
+ */
+export const lacksQuoteDetails = (p: QuoteCheck) => quoteGaps(p, true).length > 0;

@@ -42,6 +42,14 @@ describe("quoteSummary", () => {
     expect(text).not.toContain("Next step: site inspection");
   });
 
+  it("says so when part of a system has no price yet", () => {
+    const part = system("Yohako", "separate", 200_000);
+    const open = { ...part, lines: part.lines.map((l) => (l.role === "inverter" ? { ...l, unitPriceNgn: null } : l)) };
+    expect(quoteSummary(view({ systems: [open] }))).toContain("Yohako: ₦200,000 plus items priced on request (1 x Yohako inverter, 2 x Panel 650W)");
+    const none = { ...part, totalNgn: 0, lines: part.lines.map((l) => ({ ...l, unitPriceNgn: null })) };
+    expect(quoteSummary(view({ systems: [none] }))).toContain("Yohako: price on request (");
+  });
+
   it("keeps the message short when many brands fit", () => {
     const systems = ["A", "B", "C", "D", "E", "F"].map((b, i) => system(b, "separate", 1_000_000 + i));
     expect(quoteSummary(view({ systems })).split("\n").filter((l) => /^[A-F]:/.test(l))).toHaveLength(4);

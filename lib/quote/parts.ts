@@ -1,13 +1,13 @@
 import { lacksQuoteDetails } from "../admin/missing";
 import type { Parts } from "./systems";
 
-/** A published, priced catalogue product as the system builder needs it. */
+/** A published catalogue product as the system builder needs it. */
 export interface PartRow {
   id: string;
   name: string;
   slug: string;
-  /** What the customer pays today (sale price when on sale). */
-  price: number;
+  /** What the customer pays today (sale price when on sale). Null when no price is set. */
+  price: number | null;
   stock: number;
   availableOnRequest: boolean;
   brandId: string | null;
@@ -35,14 +35,16 @@ export function toParts(rows: PartRow[]): Parts {
     };
     const base = { id: r.id, name: r.name, slug: r.slug, price: r.price, stock: r.availableOnRequest ? null : r.stock };
     const brand = r.brandName ?? "";
+    // With no surge rating entered, count on the continuous rating: an inverter can always start what it can run.
+    const surgeW = n("surgeW") || n("ratedContinuousW");
     if (ENGINEER_ONLY.test(`${r.name} ${typeof specs.type === "string" ? specs.type : ""}`)) continue;
 
     switch (r.categorySlug) {
       case "inverters":
-        parts.inverters.push({ ...base, brand, continuousW: n("ratedContinuousW"), surgeW: n("surgeW"), systemVoltage: n("systemVoltage") });
+        parts.inverters.push({ ...base, brand, continuousW: n("ratedContinuousW"), surgeW, systemVoltage: n("systemVoltage") });
         break;
       case "inverter-and-battery-sets":
-        parts.sets.push({ ...base, brand, continuousW: n("ratedContinuousW"), surgeW: n("surgeW"), batteryWh: n("batteryKwh") * 1000 });
+        parts.sets.push({ ...base, brand, continuousW: n("ratedContinuousW"), surgeW, batteryWh: n("batteryKwh") * 1000 });
         break;
       case "lithium-batteries":
         parts.batteries.push({ ...base, brand, chemistry: "lithium", wh: n("capacityKwh") * 1000 || n("capacityAh") * n("voltage"), voltage: n("voltage") });

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Badge, Card, CardBody, Eyebrow, Price, buttonClass } from "@/components/ui";
+import { fullyPriced } from "@/lib/quote/systems";
 import type { SystemView } from "@/lib/quote/view";
 import { SITE, formatNaira, whatsappLink } from "@/lib/site";
 
@@ -8,12 +9,14 @@ const KIND_LABEL = { set: "Inverter with battery", separate: "Inverter and separ
 /** What the customer sends us on WhatsApp: the exact parts, so nobody has to look the quote up. */
 function orderMessage(o: SystemView, reference?: string) {
   const parts = o.lines.map((l) => `${l.quantity} x ${l.name}`).join(", ");
-  return `Hello ${SITE.shortName}, I'd like this ${o.brand} system from my quote${reference ? ` (${reference})` : ""}: ${parts}. Equipment total ${formatNaira(o.totalNgn)}.`;
+  const price = fullyPriced(o) ? `Equipment total ${formatNaira(o.totalNgn)}.` : "Please send me the full price.";
+  return `Hello ${SITE.shortName}, I'd like this ${o.brand} system from my quote${reference ? ` (${reference})` : ""}: ${parts}. ${price}`;
 }
 
 /**
  * Systems put together from the catalogue, grouped by brand, cheapest brand first. Used by the quote
  * wizard and the saved quote page. Nobody has checked these parts together, so the section says so.
+ * A product with no price yet is listed as "Price on request" and left out of the total.
  */
 export function BrandSystems({ systems, reference }: { systems: SystemView[]; reference?: string }) {
   if (systems.length === 0) return null;
@@ -24,8 +27,8 @@ export function BrandSystems({ systems, reference }: { systems: SystemView[]; re
       <div>
         <h2 className="text-title">Systems by brand</h2>
         <p className="mt-1 max-w-2xl text-sm text-muted">
-          Put together from our price list to cover your whole list. Each one stays with a single brand, and an engineer confirms it before
-          installation.
+          The devices you need, put together from what we stock to cover your whole list. Each one stays with a single brand, and an engineer
+          confirms it before installation.
         </p>
       </div>
 
@@ -40,7 +43,7 @@ export function BrandSystems({ systems, reference }: { systems: SystemView[]; re
                   <CardBody className="flex flex-1 flex-col gap-4">
                     <div className="flex flex-wrap items-center gap-2">
                       <Badge tone="brand">{KIND_LABEL[o.kind]}</Badge>
-                      {o.id === systems[0].id && <Badge tone="solar">Lowest price</Badge>}
+                      {o.id === systems[0].id && fullyPriced(o) && <Badge tone="solar">Lowest price</Badge>}
                       {o.overBudget && <Badge tone="warning">Above your budget</Badge>}
                     </div>
 
@@ -53,7 +56,11 @@ export function BrandSystems({ systems, reference }: { systems: SystemView[]; re
                               {l.name}
                             </Link>
                           </span>
-                          <span className="numeric shrink-0">{formatNaira(l.unitPriceNgn * l.quantity)}</span>
+                          {l.unitPriceNgn != null ? (
+                            <span className="numeric shrink-0">{formatNaira(l.unitPriceNgn * l.quantity)}</span>
+                          ) : (
+                            <span className="shrink-0 text-muted">Price on request</span>
+                          )}
                         </li>
                       ))}
                       <li className="flex items-baseline justify-between gap-4 py-2 text-muted">
@@ -63,8 +70,18 @@ export function BrandSystems({ systems, reference }: { systems: SystemView[]; re
                     </ul>
 
                     <div className="mt-auto">
-                      <p className="text-xs text-muted">Equipment total</p>
-                      <Price amount={o.totalNgn} size="lg" />
+                      {fullyPriced(o) ? (
+                        <>
+                          <p className="text-xs text-muted">Equipment total</p>
+                          <Price amount={o.totalNgn} size="lg" />
+                        </>
+                      ) : (
+                        // No big figure here: a part total would read as the price of the whole system.
+                        <>
+                          <p className="font-display text-subtitle text-strong">Price on request</p>
+                          {o.totalNgn > 0 && <p className="mt-1 text-sm text-muted">{formatNaira(o.totalNgn)} for the items priced above. Ask us for the rest.</p>}
+                        </>
+                      )}
                       <p className="mt-1 text-sm text-muted">
                         {(o.batteryWh / 1000).toFixed(1)} kWh {o.chemistry} battery
                         {o.backupHours != null && `, about ${o.backupHours.toFixed(1)} hours of backup`}

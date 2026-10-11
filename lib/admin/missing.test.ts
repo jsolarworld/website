@@ -41,9 +41,17 @@ describe("missingDetails", () => {
     expect(lacksQuoteDetails(product({ mediaCount: 0 }))).toBe(false);
   });
 
-  it("needs a price and a brand before an inverter can be quoted", () => {
-    expect(lacksQuoteDetails(product({ priceNgn: null }))).toBe(true);
+  it("needs a brand before an inverter can be quoted, but not a price", () => {
+    expect(lacksQuoteDetails(product({ priceNgn: null }))).toBe(false);
+    expect(lacksQuoteDetails(product({ brandId: null }))).toBe(true);
     expect(missingDetails(product({ brandId: null }))).toEqual(["brand"]);
+  });
+
+  it("still asks staff for the surge rating, though the quote tool can work without it", () => {
+    const noSurge = product({ specs: { ratedContinuousW: 6000, systemVoltage: 48 } });
+    expect(missingDetails(noSurge)).toEqual(["surge power (W)"]);
+    expect(lacksQuoteDetails(noSurge)).toBe(false);
+    expect(lacksQuoteDetails(product({ specs: { surgeW: 12000, systemVoltage: 48 } }))).toBe(true);
   });
 
   it("treats an empty or zero rating as missing", () => {

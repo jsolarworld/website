@@ -27,6 +27,14 @@ describe("toParts", () => {
     expect(toParts([row({ brandId: null, brandName: null })]).inverters).toEqual([]);
   });
 
+  it("keeps a product that has no price yet", () => {
+    expect(toParts([row({ price: null })]).inverters[0]).toMatchObject({ slug: "felicity-6kva", price: null });
+  });
+
+  it("counts on the continuous rating when no surge rating is entered", () => {
+    expect(toParts([row({ specs: { ratedContinuousW: 6000, systemVoltage: 48 } })]).inverters[0]).toMatchObject({ continuousW: 6000, surgeW: 6000 });
+  });
+
   it("never offers three-phase or high-voltage equipment automatically", () => {
     expect(toParts([row({ name: "Deye 20kVA Three-Phase Hybrid Inverter" })]).inverters).toEqual([]);
     expect(toParts([row({ specs: { ratedContinuousW: 30000, surgeW: 45000, systemVoltage: 400, type: "Hybrid, high voltage" } })]).inverters).toEqual([]);

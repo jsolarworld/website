@@ -46,7 +46,9 @@ export function computeNeeds(input: QuoteInput, s: QuoteSettings): Needs {
     backupLoadW,
     inverterContinuousW: peakW * s.inverterSafetyMargin,
     inverterSurgeW: surgeW,
-    arrayW: dailyWh / (s.peakSunHours * s.systemDerate),
+    // PRD 7.2 sizes the array for a day's energy. Since 2026-10-11 it must also carry everything running
+    // at once in full sun, so daytime use does not drain the battery. Engineers confirm both.
+    arrayW: Math.max(dailyWh / s.peakSunHours, peakW) / s.systemDerate,
     batteryWh,
     highDrawOnBackup,
   };

@@ -58,12 +58,12 @@ export async function loadPackages() {
 }
 
 /**
- * Published, priced inverters, batteries, sets and panels with every rating the quote tool reads.
+ * Published inverters, batteries, sets and panels with the ratings the quote tool needs, priced or not.
  * Out-of-stock items are dropped here; "available on request" counts as available.
  */
 export async function loadParts(): Promise<Parts> {
   const rows = await db.product.findMany({
-    where: { kind: "PRODUCT", status: "PUBLISHED", priceNgn: { not: null }, category: { slug: { in: Object.keys(QUOTE_FIELDS) } } },
+    where: { kind: "PRODUCT", status: "PUBLISHED", category: { slug: { in: Object.keys(QUOTE_FIELDS) } } },
     select: {
       id: true,
       name: true,
@@ -80,9 +80,8 @@ export async function loadParts(): Promise<Parts> {
   });
   return toParts(
     rows.flatMap((r) => {
-      const price = effectivePrice(r);
-      if (price == null || (!r.availableOnRequest && r.stock <= 0)) return [];
-      return [{ ...r, price, brandName: r.brand?.name ?? null, categorySlug: r.category.slug }];
+      if (!r.availableOnRequest && r.stock <= 0) return [];
+      return [{ ...r, price: effectivePrice(r), brandName: r.brand?.name ?? null, categorySlug: r.category.slug }];
     }),
   );
 }
@@ -103,8 +102,8 @@ export async function runQuote(req: QuoteRequest, preloaded?: QuoteSettings): Pr
 const REF_ALPHABET = "23456789ABCDEFGHJKMNPQRSTUVWXYZ";
 const newReference = () => "JSW-" + Array.from({ length: 6 }, () => REF_ALPHABET[randomInt(REF_ALPHABET.length)]).join("");
 
-/** Save a quote snapshot and attach it to a lead (reusing an open lead for the same phone). */
-export async function saveQuote(req: QuoteRequest, contact: Contact): Promise<string> {
+/** Work out a quote, save its snapshot and attach it to a lead (reusing an open lead for the same phone). */
+export async function saveQuote(req: QuoteRequest, contact: Contact): Promise<{ reference: string; view: QuoteView }> {
   // Settings are loaded once and shared; the database is a transatlantic hop, so every query counts.
   const settings = await loadSettings();
   const [view, open] = await Promise.all([
@@ -142,7 +141,7 @@ export async function saveQuote(req: QuoteRequest, contact: Contact): Promise<st
           validUntil,
         },
       });
-      return reference;
+      return { reference, view };
     } catch (e) {
       if ((e as { code?: string }).code !== "P2002") throw e;
     }

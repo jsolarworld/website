@@ -78,7 +78,7 @@ const sampleProducts = [
 /* Class names are written out in full: Tailwind scans source text, so a
    template-literal class like `bg-${x}` would never be generated. */
 // Made-up ratings and prices, run through the real builder for a small home, so the sample shows what a customer would see.
-const samplePart = (name: string, price: number) => ({ id: name, name, slug: name.toLowerCase().replace(/[^a-z0-9]+/g, "-"), price, stock: null });
+const samplePart = (name: string, price: number | null) => ({ id: name, name, slug: name.toLowerCase().replace(/[^a-z0-9]+/g, "-"), price, stock: null });
 const sampleNeeds = computeNeeds(
   {
     backupHours: 12,
@@ -99,7 +99,8 @@ const sampleSystems = buildSystems(
   {
     inverters: [
       { ...samplePart("Felicity 6kVA Hybrid Inverter 48V", 950_000), brand: "Felicity", continuousW: 6000, surgeW: 12000, systemVoltage: 48 },
-      { ...samplePart("Deye 6kW Hybrid Inverter", 1_400_000), brand: "Deye", continuousW: 6000, surgeW: 12000, systemVoltage: 48 },
+      // No price, to show how a product that is "price on request" is listed.
+      { ...samplePart("Deye 6kW Hybrid Inverter", null), brand: "Deye", continuousW: 6000, surgeW: 12000, systemVoltage: 48 },
     ],
     batteries: [
       { ...samplePart("Felicity 5kWh Lithium Battery 48V", 1_050_000), brand: "Felicity", chemistry: "lithium", wh: 5120, voltage: 51.2 },
@@ -589,7 +590,7 @@ export default function DesignSystemPage() {
           <SectionHeader
             eyebrow="Components"
             title="Quote: systems by brand"
-            lead="What the quote tool shows once products carry their ratings: one or two systems per brand, never mixed, cheapest first. The sample ratings and prices here are made up."
+            lead="What the quote tool shows once products carry their ratings: one or two systems per brand, never mixed, cheapest first, with the ones waiting for a price last. The sample ratings and prices here are made up."
           />
 
           <div className="mt-12">

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { APPLIANCES, itemFromAppliance } from "./appliances";
 import { DEFAULT_SETTINGS } from "./defaults";
 import { computeNeeds } from "./engine";
-import { buildSystems, pickPanel, tooLarge, voltageClass, type BatteryPart, type InverterPart, type PanelPart, type Parts, type SetPart } from "./systems";
+import { buildSystems, fullyPriced, pickPanel, tooLarge, voltageClass, type BatteryPart, type InverterPart, type PanelPart, type Parts, type SetPart } from "./systems";
 import type { QuoteInput } from "./types";
 
 const byId = (id: string) => APPLIANCES.find((a) => a.id === id)!;
@@ -23,8 +23,8 @@ const flat: QuoteInput = {
 };
 const needs = computeNeeds(flat, s);
 
-const part = (id: string, price: number) => ({ id, name: id, slug: id, price, stock: null });
-const inverter = (id: string, brand: string, price: number, over: Partial<InverterPart> = {}): InverterPart => ({
+const part = (id: string, price: number | null) => ({ id, name: id, slug: id, price, stock: null });
+const inverter = (id: string, brand: string, price: number | null, over: Partial<InverterPart> = {}): InverterPart => ({
   ...part(id, price),
   brand,
   continuousW: 3000,
@@ -32,7 +32,7 @@ const inverter = (id: string, brand: string, price: number, over: Partial<Invert
   systemVoltage: 24,
   ...over,
 });
-const lithium = (id: string, brand: string, price: number, wh: number, voltage = 25.6, over: Partial<BatteryPart> = {}): BatteryPart => ({
+const lithium = (id: string, brand: string, price: number | null, wh: number, voltage = 25.6, over: Partial<BatteryPart> = {}): BatteryPart => ({
   ...part(id, price),
   brand,
   chemistry: "lithium",
@@ -49,7 +49,7 @@ const set = (id: string, brand: string, price: number, over: Partial<SetPart> = 
   batteryWh: 5000,
   ...over,
 });
-const panel = (id: string, price: number, watts: number, stock: number | null = null): PanelPart => ({ ...part(id, price), watts, stock });
+const panel = (id: string, price: number | null, watts: number, stock: number | null = null): PanelPart => ({ ...part(id, price), watts, stock });
 
 const parts = (over: Partial<Parts>): Parts => ({ inverters: [], batteries: [], sets: [], panels: [panel("p550", 110_000, 550)], ...over });
 const ids = (list: ReturnType<typeof buildSystems>) => list.map((o) => o.id);
@@ -101,6 +101,8 @@ describe("buildSystems", () => {
     const [o] = buildSystems(needs, parts({ inverters: [inverter("inv", "Felicity", 400_000)], batteries: [tubular("t200", "Felicity", 250_000)] }), s);
     expect(o).toMatchObject({ chemistry: "tubular", batteryWh: 9600 });
     expect(o.lines[1].quantity).toBe(4);
+    // The same 0.3 W per Wh applies to the bigger tubular bank: 2,880 W, so 6 panels where lithium takes 3.
+    expect(o.lines[2]).toMatchObject({ role: "panel", quantity: 6 });
   });
 
   it("follows the battery type the customer asked for", () => {
@@ -124,6 +126,15 @@ describe("buildSystems", () => {
     expect(o).toMatchObject({ id: "Cworth:set", kind: "set", batteryWh: 5000 });
     expect(o.lines[0].slug).toBe("fit");
     expect(o.totalNgn).toBe(2_500_000 + 3 * 110_000);
+  });
+
+  it("adds panels when the system's battery is bigger than the home needs, so it still refills in about a day", () => {
+    // The home needs 1,377 W (3 panels). A 16 kWh battery at 0.3 W per Wh asks for 4,800 W: 9 panels.
+    const [o] = buildSystems(needs, parts({ sets: [set("big", "Cworth", 3_000_000, { batteryWh: 16_000 })] }), s);
+    expect(o.lines.at(-1)).toMatchObject({ role: "panel", quantity: 9 });
+    // With the rule switched off, the count falls back to the home's own need.
+    const [plain] = buildSystems(needs, parts({ sets: [set("big", "Cworth", 3_000_000, { batteryWh: 16_000 })] }), { ...s, panelWPerBatteryWh: 0 });
+    expect(plain.lines.at(-1)).toMatchObject({ role: "panel", quantity: 3 });
   });
 
   it("lists every brand, cheapest first, with the set and the separate pairing side by side", () => {
@@ -164,6 +175,38 @@ describe("buildSystems", () => {
     expect(tooLarge(needs, s)).toBe(false);
   });
 
+  it("lists a product with no price as part of the system, and leaves it out of the total", () => {
+    const [o] = buildSystems(needs, parts({ inverters: [inverter("inv", "Yohako", null)], batteries: [lithium("b", "Yohako", 550_000, 5120)] }), s);
+    expect(o.lines.map((l) => [l.role, l.unitPriceNgn])).toEqual([["inverter", null], ["battery", 550_000], ["panel", 110_000]]);
+    expect(o.totalNgn).toBe(550_000 + 3 * 110_000);
+    expect(fullyPriced(o)).toBe(false);
+  });
+
+  it("takes the cheapest priced pairing, unless one with no price is a closer fit", () => {
+    const inv = inverter("inv", "Felicity", 400_000);
+    const big = lithium("big", "Felicity", 2_000_000, 16_000);
+    const sameSize = buildSystems(needs, parts({ inverters: [inv], batteries: [lithium("priced", "Felicity", 550_000, 5120), lithium("open", "Felicity", null, 5120)] }), s);
+    expect(sameSize[0].lines[1].slug).toBe("priced");
+    // The only priced battery is three times the need; the right-sized one has no price yet.
+    const closer = buildSystems(needs, parts({ inverters: [inv], batteries: [big, lithium("open", "Felicity", null, 5120)] }), s);
+    expect(closer[0].lines[1].slug).toBe("open");
+    // A slightly smaller bank does not win when its priced parts already cost more than the priced pairing.
+    const batteries = [lithium("b5", "Felicity", 550_000, 5120), lithium("b44", "Felicity", 1_200_000, 4400)];
+    const dearer = buildSystems(needs, parts({ inverters: [inv, inverter("open-inv", "Felicity", null)], batteries }), s);
+    expect(dearer[0].lines.map((l) => l.slug).slice(0, 2)).toEqual(["inv", "b5"]);
+    // With nothing priced, the smallest battery that covers the need.
+    const none = buildSystems(needs, parts({ inverters: [inv], batteries: [{ ...big, price: null }, lithium("open", "Felicity", null, 5120)] }), s);
+    expect(none[0].lines[1].slug).toBe("open");
+  });
+
+  it("lists systems that are waiting for a price after the priced ones", () => {
+    const p = parts({
+      inverters: [inverter("a-inv", "Africell", null), inverter("f-inv", "Felicity", 400_000)],
+      batteries: [lithium("a-b", "Africell", 100_000, 5120), lithium("f-b", "Felicity", 900_000, 5120)],
+    });
+    expect(ids(buildSystems(needs, p, s))).toEqual(["Felicity:separate", "Africell:separate"]);
+  });
+
   it("survives JSON, since saved quotes store it", () => {
     const systems = buildSystems(needs, parts({ inverters: [inverter("inv", "Felicity", 400_000)], batteries: [lithium("b", "Felicity", 550_000, 5120)] }), s);
     expect(JSON.parse(JSON.stringify(systems))).toEqual(systems);
@@ -178,6 +221,11 @@ describe("pickPanel", () => {
   it("skips a panel the shop has too few of", () => {
     expect(pickPanel([panel("p650", 120_000, 650, 2), panel("p300", 80_000, 300)], 1377)?.id).toBe("p300");
     expect(pickPanel([], 1377)).toBeNull();
+  });
+
+  it("prefers a priced panel, and with none priced takes the biggest", () => {
+    expect(pickPanel([panel("p780", null, 780), panel("p300", 80_000, 300)], 1377)?.id).toBe("p300");
+    expect(pickPanel([panel("p450", null, 450), panel("p780", null, 780)], 1377)?.id).toBe("p780");
   });
 });
 
