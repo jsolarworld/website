@@ -10,6 +10,11 @@
  * before it: where the title and the specification disagree, the rating is left out and a note says so.
  * Descriptions are short and written here from the facts he gave, not his pasted text.
  *
+ * On 11 October 2026 he said which second-batch items were products already on the site. Those entries were
+ * taken out of this list; their pictures and descriptions are in CHAT_ADDITIONS, and on the site the duplicates
+ * are archived (hidden, kept) with their addresses redirected to the product that stays. He now enters prices
+ * himself in the dashboard, so a price here is only what he first captioned.
+ *
  * To add more: append an entry, put its files in `chat/`, run `pnpm import:chat`, then `pnpm import:chat --apply`.
  */
 
@@ -213,7 +218,8 @@ export const CHAT_PRODUCTS: ChatProduct[] = [
     category: "lithium-batteries",
     brand: "Felicity",
     priceNgn: 1_000_000,
-    specs: { capacityKwh: 5, voltage: 24 },
+    // The same battery as the LPBF24200-M (24V 200Ah) in his second list.
+    specs: { capacityKwh: 5, voltage: 24, capacityAh: 200, cells: "LiFePO4" },
     media: [{ file: "IMG-20261002-WA0014.jpg", alt: "Felicity FLA 5kWh 24V lithium battery with its display on" }],
   },
   {
@@ -253,7 +259,8 @@ export const CHAT_PRODUCTS: ChatProduct[] = [
     category: "lithium-batteries",
     brand: "Felicity",
     priceNgn: 4_000_000,
-    specs: { capacityKwh: 25 },
+    // The same battery as the FLA48500 (48V 500Ah) in his second list.
+    specs: { capacityKwh: 25, voltage: 48, capacityAh: 500, cells: "LiFePO4" },
     media: [{ file: "IMG-20261002-WA0053.jpg", alt: "Felicity 25kWh lithium battery on wheels" }],
   },
   {
@@ -597,15 +604,6 @@ export const CHAT_PRODUCTS: ChatProduct[] = [
 
   // ─── Read off a label only: hidden drafts until the owner names and prices them ─
   {
-    name: "Sako 2.56kWh Lithium Battery 25.6V",
-    category: "lithium-batteries",
-    brand: "Sako",
-    priceNgn: null,
-    status: "DRAFT",
-    specs: { capacityKwh: 2.56, voltage: 25.6, capacityAh: 100 },
-    media: [{ file: "IMG-20260921-WA0096.jpg", alt: "Stack of Sako Li-Sun 25.6V 2.56kWh lithium battery cartons" }],
-  },
-  {
     name: "Ecolion 9kWh Lithium Battery 25.6V",
     category: "lithium-batteries",
     brand: "Ecolion",
@@ -773,16 +771,6 @@ export const CHAT_PRODUCTS: ChatProduct[] = [
     media: [{ file: "IMG-20261003-WA0043.jpg", alt: "Felicity tower-type lithium battery: stacked modules under a unit with a round display" }],
   },
   {
-    name: "Felicity LPBF24200-M 5kWh Lithium Battery 24V 200Ah",
-    category: "lithium-batteries",
-    brand: "Felicity",
-    priceNgn: null,
-    specs: { capacityKwh: 5, voltage: 24, capacityAh: 200, cells: LFP },
-    description: "24V 200Ah LiFePO4 lithium battery with a built-in battery management system. Rated for over 6,000 cycles at 80% depth of discharge.",
-    media: [{ file: "IMG-20261003-WA0046.jpg", alt: "Felicity LPBF24200-M 24V 200Ah lithium battery, front view" }],
-    note: 'May be the same battery as "Felicity FLA 5kWh Lithium Battery 24V" (₦1,000,000), which is already on the site. The description he pasted with it was for a 48V 100Ah wall-mount battery, so it was not used.',
-  },
-  {
     name: "Felicity FLA48300 15kWh Lithium Battery 48V 300Ah",
     category: "lithium-batteries",
     brand: "Felicity",
@@ -791,18 +779,7 @@ export const CHAT_PRODUCTS: ChatProduct[] = [
     description:
       "48V 300Ah LiFePO4 lithium battery on wheels, with a built-in battery management system. Rated for over 6,000 cycles at 80% depth of discharge. More units can be added for more capacity.",
     media: [{ file: "IMG-20261003-WA0047.jpg", alt: "Felicity FLA48300 15kWh lithium battery standing on wheels" }],
-    note: "May be the same battery as one of the two Felicity 15kWh batteries already on the site (₦2,000,000 each).",
-  },
-  {
-    name: "Felicity FLA48500 25kWh Lithium Battery 48V 500Ah",
-    category: "lithium-batteries",
-    brand: "Felicity",
-    priceNgn: null,
-    specs: { capacityKwh: 25, voltage: 48, capacityAh: 500, cells: LFP },
-    description:
-      "48V 500Ah LiFePO4 lithium battery on wheels, with a built-in battery management system. Rated for over 6,000 cycles at 80% depth of discharge. Charges fast and loses little charge when standing.",
-    media: [{ file: "IMG-20261003-WA0048.jpg", alt: "Felicity FLA48500 25kWh lithium battery standing on wheels" }],
-    note: 'May be the same battery as "Felicity 25kWh Lithium Battery" (₦4,000,000), which is already on the site.',
+    note: "The owner says this is not one of the two Felicity 15kWh batteries that were already on the site; he priced it himself in the dashboard.",
   },
   {
     name: "Felicity LPBF48150 7.2kWh Wall-Mount Lithium Battery 48V 150Ah",
@@ -886,17 +863,6 @@ export const CHAT_PRODUCTS: ChatProduct[] = [
     media: [{ file: "IMG-20261003-WA0050.jpg", alt: "Felicity IVGM 8KLP2G1 8kVA hybrid inverter, front view" }],
   },
   {
-    name: "Felicity IVEM6048 6kVA Hybrid Inverter 48V",
-    category: "inverters",
-    brand: "Felicity",
-    priceNgn: 600_000,
-    specs: { ratedKva: 6, systemVoltage: 48, type: HYBRID },
-    description:
-      "6kVA, 48V hybrid inverter with pure sine wave output and a built-in MPPT solar charge controller (up to 120A). Works with lithium, gel and AGM batteries. Accepts mains from 90 to 280V. LCD display.",
-    media: [{ file: "IMG-20261003-WA0051.jpg", alt: "Felicity IVEM6048 6kVA hybrid inverter, front view" }],
-    note: 'Close to "Felicity 6kVA Hybrid Inverter 48V (IVEM6048-II)" (₦550,000), which is already on the site. Ask whether they are two models.',
-  },
-  {
     name: "Felicity IVPS10048 10kVA Pure Sine Wave Inverter 48V",
     category: "inverters",
     brand: "Felicity",
@@ -976,6 +942,7 @@ export const CHAT_PRODUCTS: ChatProduct[] = [
     media: [{ file: "IMG-20261003-WA0062.jpg", alt: "Yohako pure sine wave inverter, upright with a green stripe" }],
     note: "The title says 7.5kVA but the specification under it says 8000VA, so the rating is left out of the details.",
   },
+  // Zentres is the name of this Yohako inverter range (the owner, 11 October).
   {
     name: "Yohako Zentres 5.5kVA Pure Sine Wave Inverter 24/48V",
     category: "inverters",
@@ -983,7 +950,6 @@ export const CHAT_PRODUCTS: ChatProduct[] = [
     priceNgn: null,
     specs: { ratedKva: 5.5, type: PURE_SINE },
     media: [{ file: "IMG-20261003-WA0062.jpg", alt: "Yohako pure sine wave inverter, upright with a green stripe" }],
-    note: '"Zentres" is kept as he typed it; the picture shows a Yohako inverter. Ask what Zentres means.',
   },
   {
     name: "Yohako Zentres 3.5kVA Pure Sine Wave Inverter 24/48V",
@@ -1066,7 +1032,7 @@ export const CHAT_PRODUCTS: ChatProduct[] = [
     specs: { systemVoltage: 24, type: LOW_FREQUENCY_HYBRID },
     description: YOHAKO_HYBRID,
     media: [{ file: "IMG-20261003-WA0065.jpg", alt: "Yohako MPPT hybrid inverter with a yellow lower half" }],
-    note: 'The specification under it is a copy of the 2.5kVA one, so the ratings are left out. May be the same inverter as "Yohako 1.5kVA Pure Sine Wave Inverter 24V" (₦250,000), already on the site.',
+    note: "The specification under it is a copy of the 2.5kVA one, so the ratings are left out. The owner says it is not the white 1.5kVA pure sine wave inverter: this yellow one is the hybrid.",
   },
   {
     name: "Yohako 10kVA Wall-Mounted Hybrid Inverter 48/96V",
@@ -1425,6 +1391,7 @@ export const CHAT_PRODUCTS: ChatProduct[] = [
   },
 
   // ─── Yohako street lights, freezers, stabilizers, air conditioners, water heaters ─
+  // The owner confirmed the Y4, Y6 and Y8 lights are Yohako (different types); the YD came in the same list.
   {
     name: "Yohako Y4 80W All-in-One Solar Street Light",
     category: "solar-street-lights",
@@ -1433,7 +1400,6 @@ export const CHAT_PRODUCTS: ChatProduct[] = [
     specs: { watts: 80, type: ALL_IN_ONE },
     description: "80W all-in-one solar street light with 120 LEDs (SMD3030) and a 3.2V 60Ah LiFePO4 battery rated for over 2,600 cycles. Works from -20°C to 60°C.",
     media: [{ file: "IMG-20261003-WA0082.jpg", alt: "Y4 80W all-in-one solar street light with four LED strips, and its solar panel side" }],
-    note: "The four Y-series street lights were not given a brand; Yohako is taken from the Yohako list they came in.",
   },
   {
     name: "Yohako Y8 80W All-in-One Solar Street Light",
@@ -1675,9 +1641,12 @@ export const CHAT_PRODUCTS: ChatProduct[] = [
     category: "lithium-batteries",
     brand: "Sako",
     priceNgn: 672_000,
-    specs: { capacityKwh: 2.5, voltage: 24, cells: LFP },
-    media: [{ file: "IMG-20261003-WA0100.jpg", alt: "Sako LiFePO4 lithium battery power bank, front view" }],
-    note: 'Probably the same battery as the hidden draft "Sako 2.56kWh Lithium Battery 25.6V", made earlier from a label. If so, delete the draft.',
+    // The cartons in his shop (marked 25.6V 2.56kWh 100Ah) are this battery, he says.
+    specs: { capacityKwh: 2.5, voltage: 24, capacityAh: 100, cells: LFP },
+    media: [
+      { file: "IMG-20261003-WA0100.jpg", alt: "Sako LiFePO4 lithium battery power bank, front view" },
+      { file: "IMG-20260921-WA0096.jpg", alt: "Stack of Sako Li-Sun 25.6V 2.56kWh lithium battery cartons" },
+    ],
   },
   {
     name: "Sako 5kWh Lithium Battery",
@@ -1713,13 +1682,13 @@ export const CHAT_PRODUCTS: ChatProduct[] = [
     media: [{ file: "IMG-20261003-WA0102.jpg", alt: "Sako 51.2V 17.5kWh lithium battery on wheels, with carry handles" }],
   },
   {
-    name: "Sako Li-Wall Lithium Battery 51.2V",
+    // His caption said 35kWh; he confirmed it is 32kWh, as the picture says. First imported without the capacity in its name.
+    name: "Sako Li-Wall 32kWh Lithium Battery 51.2V",
     category: "lithium-batteries",
     brand: "Sako",
     priceNgn: 4_224_000,
-    specs: { voltage: 51.2 },
+    specs: { capacityKwh: 32, voltage: 51.2 },
     media: [{ file: "IMG-20261003-WA0098.jpg", alt: "Sako Li-Wall 51.2V lithium battery power bank on wheels, marked 32kWh" }],
-    note: "The caption says 35kWh but the picture he sent with it is marked 32kWh, so the capacity is left out of the name and details. Ask which it is.",
   },
   {
     name: "Sako ESS 300W Solar Generator (Alpha-I-ESS-300W)",
@@ -1758,7 +1727,7 @@ export const CHAT_PRODUCTS: ChatProduct[] = [
   },
 ];
 
-/** Sent with the catalogue of 3 October 2026 for three products that were already on the site. */
+/** Sent with the catalogue of 3 October 2026 for products that were already on the site. */
 export const CHAT_ADDITIONS: ChatAddition[] = [
   {
     slug: "felicity-p2-60w-all-in-one-solar-street-light",
@@ -1775,5 +1744,26 @@ export const CHAT_ADDITIONS: ChatAddition[] = [
     description:
       "Portable 1kWh LiFePO4 power unit with a built-in 250W inverter and MPPT solar charge controller. It charges from solar panels (up to 200W) or from mains and takes over by itself when the power goes off. Weighs about 8.7kg and is rated for up to 8,000 charge cycles.",
     media: [{ file: "IMG-20261003-WA0044.jpg", alt: "Felicity HOPE1000 portable lithium power unit, dark grey" }],
+  },
+  // The next three came as separate items; the owner then said each is a product he had already listed.
+  {
+    // Sent as "Felicity IVEM6048 6kVA Hybrid Inverter (48V)" at ₦600,000; he says the 6kVA is ₦550,000.
+    slug: "felicity-6kva-hybrid-inverter-48v-ivem6048-ii",
+    description:
+      "6kVA, 48V hybrid inverter with pure sine wave output and a built-in MPPT solar charge controller (up to 120A). Works with lithium, gel and AGM batteries. Accepts mains from 90 to 280V. LCD display.",
+    media: [{ file: "IMG-20261003-WA0051.jpg", alt: "Felicity IVEM6048 6kVA hybrid inverter, front view" }],
+  },
+  {
+    // Sent as "Felicity FLA48500 25KW Lithium Battery (48V 500Ah)".
+    slug: "felicity-25kwh-lithium-battery",
+    description:
+      "48V 500Ah LiFePO4 lithium battery on wheels, with a built-in battery management system. Rated for over 6,000 cycles at 80% depth of discharge. Charges fast and loses little charge when standing.",
+    media: [{ file: "IMG-20261003-WA0048.jpg", alt: "Felicity FLA48500 25kWh lithium battery standing on wheels" }],
+  },
+  {
+    // Sent as "Felicity LPBF24200-M – 24V 5KW 200Ah LiFePO₄ Battery".
+    slug: "felicity-fla-5kwh-lithium-battery-24v",
+    description: "24V 200Ah LiFePO4 lithium battery with a built-in battery management system. Rated for over 6,000 cycles at 80% depth of discharge.",
+    media: [{ file: "IMG-20261003-WA0046.jpg", alt: "Felicity LPBF24200-M 24V 200Ah lithium battery, front view" }],
   },
 ];
