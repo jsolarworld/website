@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Card, CardBody, Container, Eyebrow, Rule, Section, SectionHeader, buttonClass } from "@/components/ui";
 import { CategoryArt } from "@/components/category-art";
+import { HeroVideo } from "@/components/hero-video";
 import { ProductCard } from "@/components/product-card";
 import { getCategories, getFeaturedProducts } from "@/lib/catalogue";
 import { SITE, jsonLd, localBusiness, telLink, whatsappLink } from "@/lib/site";
@@ -20,7 +21,8 @@ export default async function Home() {
     <>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd(localBusiness) }} />
 
-      <section className="relative overflow-hidden bg-chassis text-on-chassis">
+      <section className="relative isolate overflow-hidden bg-chassis text-on-chassis">
+        <HeroVideo />
         <div aria-hidden className="sun-bloom-dark pointer-events-none absolute inset-0" />
         <Container className="relative py-20 sm:py-28">
           <Eyebrow className="text-solar-400">{SITE.slogan}</Eyebrow>
@@ -28,7 +30,8 @@ export default async function Home() {
             Power that stays on. Sized to your home.
           </h1>
           <Rule className="mt-7" />
-          <p className="mt-6 max-w-xl text-base leading-relaxed text-on-chassis-muted">
+          {/* Full-strength text, not the muted tone: the video behind the wash has bright scenes. */}
+          <p className="mt-6 max-w-xl text-base leading-relaxed text-on-chassis">
             Inverters, lithium and tubular batteries, solar panels, street lights and complete systems, sold and
             installed from Alaba International Market, Lagos. We deliver to all 36 states.
           </p>

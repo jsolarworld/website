@@ -46,5 +46,8 @@ next-env.d.ts
 # client data (customer phone numbers, chat export)
 /chat
 
+# original videos and photos the site's own files are made from (too big for git; see scripts/hero-video.sh)
+/media-source
+
 # alternate build/dev cache (NEXT_DIST_DIR)
 /.next-*/
