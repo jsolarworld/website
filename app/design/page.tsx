@@ -24,6 +24,7 @@ import {
   Textarea,
   buttonClass,
 } from "@/components/ui";
+import { CATEGORY_ART_SLUGS, CategoryArt } from "@/components/category-art";
 import { ProductCard } from "@/components/product-card";
 import { BrandSystems } from "@/components/quote/brand-systems";
 import type { ProductCardData } from "@/lib/catalogue";
@@ -578,6 +579,28 @@ export default function DesignSystemPage() {
             {sampleProducts.map((p) => (
               <li key={p.id}>
                 <ProductCard product={p} />
+              </li>
+            ))}
+          </ul>
+        </Container>
+      </Section>
+
+      {/* ---------------------------------------------------------------- */}
+      <Section id="category-art" tone="surface">
+        <Container>
+          <SectionHeader
+            eyebrow="Components"
+            title="Category art"
+            lead="One small drawing per category, in the same navy and gold as the product placeholder, for the home page tiles. A category with no drawing of its own gets the solar panel."
+          />
+
+          <ul className="mt-12 grid grid-cols-2 gap-4 sm:grid-cols-4 lg:grid-cols-8">
+            {CATEGORY_ART_SLUGS.map((slug) => (
+              <li key={slug}>
+                <Card className="overflow-hidden">
+                  <CategoryArt slug={slug} className="h-24" />
+                  <p className="px-2 py-2 text-center font-mono text-xs text-muted">{slug}</p>
+                </Card>
               </li>
             ))}
           </ul>

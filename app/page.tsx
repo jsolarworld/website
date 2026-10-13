@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Card, CardBody, Container, Eyebrow, Rule, Section, SectionHeader, buttonClass } from "@/components/ui";
+import { CategoryArt } from "@/components/category-art";
 import { ProductCard } from "@/components/product-card";
 import { getCategories, getFeaturedProducts } from "@/lib/catalogue";
 import { SITE, jsonLd, localBusiness, telLink, whatsappLink } from "@/lib/site";
@@ -56,8 +57,9 @@ export default async function Home() {
             <ul className="mt-8 grid grid-cols-2 gap-4 lg:grid-cols-4">
               {categories.map((c) => (
                 <li key={c.id}>
-                  <Card interactive className="h-full">
-                    <CardBody>
+                  <Card interactive className="h-full overflow-hidden">
+                    <CategoryArt slug={c.slug} className="h-20 sm:h-28" />
+                    <CardBody className="p-4 sm:p-5">
                       <h3 className="text-subtitle">
                         <Link href={`/categories/${c.slug}`} className="after:absolute after:inset-0">
                           {c.name}

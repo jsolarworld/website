@@ -85,6 +85,12 @@ tabular figures so a column of prices lines up.
 | `Field` / `Input` / `Select` / `Textarea` | `Field` wires label + hint + error + ARIA. Server-renderable: it takes a `name` rather than calling `useId`, so forms need no `"use client"`. |
 | `Notice` / `EmptyState` / `Skeleton` | Colour-rail messages, empty states that offer the next action, shimmer placeholders. |
 
+Two drawn pictures live outside `components/ui/`: `ProductPlaceholder` (a product with no photo yet) and
+`CategoryArt` (`components/category-art.tsx`, one small drawing per category slug for the home page
+tiles; see `/design#category-art`). Both are drawings in the logo's navy and gold, so they use ramp
+stops directly; that exception is for drawings only. A new category needs a drawing added under its
+slug, and until then it shows the solar panel.
+
 ## Gotcha: `cn()` and custom theme keys
 
 `lib/cn.ts` extends `tailwind-merge` with this project's custom `@theme` names. This is not
