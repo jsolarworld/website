@@ -52,7 +52,7 @@ export default async function PostPage({ params }: Props) {
       datePublished: post.publishedAt?.toISOString(),
       dateModified: post.updatedAt.toISOString(),
       author: { "@type": post.author?.name ? "Person" : "Organization", name: post.author?.name ?? SITE.name },
-      publisher: { "@type": "Organization", name: SITE.name, logo: { "@type": "ImageObject", url: `${SITE.url}/logo.webp` } },
+      publisher: { "@type": "Organization", name: SITE.name, logo: { "@type": "ImageObject", url: `${SITE.url}/j-solar-world-logo.png` } },
       mainEntityOfPage: url,
     },
     {

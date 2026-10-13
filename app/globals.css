@@ -183,6 +183,9 @@
   --bg-sunken: var(--color-slate-50);
   --bg-chassis: var(--color-navy-900);
   --bg-chassis-raised: var(--color-navy-800);
+  /* The site header: the pale blue behind the company logo (public/j-solar-world-logo.png is
+     #bfd7fe, this stop exactly), so the logo's navy lettering needs no tile under it. */
+  --bg-masthead: var(--color-navy-200);
 
   --text-strong: var(--color-ink);
   --text-default: #2b3547;
@@ -190,10 +193,14 @@
   --text-subtle: var(--color-slate-400);
   --text-on-chassis: #e9f0fd;
   --text-on-chassis-muted: #9db4e0;
+  /* On the masthead's pale blue these are 10:1 and 6.6:1. */
+  --text-on-masthead: var(--color-navy-900);
+  --text-on-masthead-muted: var(--color-navy-700);
 
   --line: var(--color-slate-200);
   --line-strong: var(--color-slate-300);
   --line-on-chassis: rgb(255 255 255 / 0.15);
+  --line-on-masthead: rgb(3 47 127 / 0.18);
 
   --accent: var(--color-solar-400);
   --accent-hover: var(--color-solar-300);
@@ -212,6 +219,7 @@
   --color-sunken: var(--bg-sunken);
   --color-chassis: var(--bg-chassis);
   --color-chassis-raised: var(--bg-chassis-raised);
+  --color-masthead: var(--bg-masthead);
 
   --color-strong: var(--text-strong);
   --color-default: var(--text-default);
@@ -219,10 +227,13 @@
   --color-subtle: var(--text-subtle);
   --color-on-chassis: var(--text-on-chassis);
   --color-on-chassis-muted: var(--text-on-chassis-muted);
+  --color-on-masthead: var(--text-on-masthead);
+  --color-on-masthead-muted: var(--text-on-masthead-muted);
 
   --color-line: var(--line);
   --color-line-strong: var(--line-strong);
   --color-line-on-chassis: var(--line-on-chassis);
+  --color-line-on-masthead: var(--line-on-masthead);
 
   --color-accent: var(--accent);
   --color-accent-hover: var(--accent-hover);

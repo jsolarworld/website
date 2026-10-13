@@ -25,7 +25,7 @@ export function CartLink() {
   usePathname(); // a navigation (e.g. the redirect after "Add to cart") re-renders this and refreshes the count
   const count = useSyncExternalStore(subscribe, readCount, () => 0);
   return (
-    <Link href="/cart" className="relative rounded-md px-3 py-2 text-sm font-medium text-on-chassis hover:bg-white/10 hover:text-white" aria-label={`Cart, ${count} items`}>
+    <Link href="/cart" className="relative rounded-md px-3 py-2 text-sm font-medium text-on-masthead hover:bg-white/50" aria-label={`Cart, ${count} items`}>
       Cart
       {count > 0 && <span className="ml-1.5 rounded-full bg-solar-400 px-1.5 py-0.5 text-xs font-bold text-navy-900">{count}</span>}
     </Link>

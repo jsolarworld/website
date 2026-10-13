@@ -9,9 +9,13 @@ heavy-duty, warm where it counts. Three roles, and nothing plays two of them:
 
 | Role | Colour | Where |
 | --- | --- | --- |
-| **Chassis** | navy | Header, footer, spec panels, quote results. Structure and trust. |
+| **Chassis** | navy | Footer, spec panels, quote results, the admin bar. Structure and trust. |
 | **Energy** | solar gold | The primary action. One per view. |
 | **Status** | grid green / ember / alert | In stock, on sale, failed. Signal only, never decoration. |
+
+The public header is the one exception to navy structure: it is the **masthead**, the pale blue the
+company logo sits on (`bg-masthead`, with `text-on-masthead`, `text-on-masthead-muted` and
+`border-line-on-masthead`), so the logo's navy lettering shows without a tile behind it.
 
 Everything sits on **warm paper** (`#fbfaf6`), not the usual cold grey. A hair of yellow under cool
 blue makes the blue read richer and the gold sing, and it holds up better on a cheap Android screen
@@ -19,8 +23,10 @@ in daylight — which is most of this traffic.
 
 ## Colour
 
-Four ramps are sampled directly from the company logo (`chat/STK-20260919-WA0042.webp`); `slate` and
-`alert` are derived to sit with them.
+Four ramps are sampled directly from the company's first logo (`chat/STK-20260919-WA0042.webp`);
+`slate` and `alert` are derived to sit with them. The current logo (`public/j-solar-world-logo.png`,
+and `-transparent.png` for the header) is drawn in three of those stops: `navy-600` for the panels
+and lettering, `solar-500` for the gold row, and `navy-200` for its background.
 
 | Ramp | Logo source | Use |
 | --- | --- | --- |
