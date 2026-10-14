@@ -8,6 +8,7 @@ import { ComponentsField, type ComponentOption, type ComponentRow } from "./comp
 import { MediaField, type MediaItem } from "./media-field";
 import { brandNeeded, quoteSpecKeys } from "@/lib/admin/missing";
 import { NEW_BRAND, type SpecField } from "@/lib/admin/product-form";
+import { ACCESSORY_CATEGORIES, ACCESSORY_KINDS } from "@/lib/quote/accessories";
 
 export interface ProductFormInitial {
   id: string;
@@ -164,6 +165,12 @@ export function ProductForm({ initial, categories, brands, componentOptions, can
                 </Field>
               ))}
             </div>
+            {ACCESSORY_CATEGORIES.includes(category?.slug ?? "") && (
+              <p className="mt-3 text-sm text-muted">
+                Quotes list these as accessories when the name or the type says what it is: {ACCESSORY_KINDS.map((k) => k.label.toLowerCase()).join(", ")}.
+                The price shown is for one piece.
+              </p>
+            )}
             {category?.name.toLowerCase().includes("inverter") && (
               <p className="mt-3 text-sm text-muted">
                 &quot;Rated continuous power&quot; is the true output in watts, printed on the inverter label. It is not the same as the kVA number in the name.

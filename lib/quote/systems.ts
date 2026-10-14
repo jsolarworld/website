@@ -1,3 +1,4 @@
+import { hoursCovered } from "./engine";
 import type { Chemistry, Needs, QuoteSettings } from "./types";
 
 /**
@@ -155,7 +156,7 @@ export function buildSystems(needs: Needs, parts: Parts, s: QuoteSettings, chemi
       ...o,
       lines,
       totalNgn: lines.reduce((sum, l) => sum + (l.unitPriceNgn ?? 0) * l.quantity, 0),
-      backupHours: needs.backupLoadW > 0 ? (o.batteryWh * s.depthOfDischarge[o.chemistry] * s.inverterEfficiency) / needs.backupLoadW : null,
+      backupHours: hoursCovered(o.batteryWh, o.chemistry, needs.backupDraws, s),
     };
   };
 

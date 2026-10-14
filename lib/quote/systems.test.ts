@@ -8,7 +8,8 @@ import type { QuoteInput } from "./types";
 const byId = (id: string) => APPLIANCES.find((a) => a.id === id)!;
 const s = DEFAULT_SETTINGS;
 
-// PRD 7.4 flat: needs 669 W continuous, 835 W surge, 4.33 kWh lithium (6.92 tubular), 1,377 W of panels.
+// PRD 7.4 flat: needs 669 W continuous, 835 W surge, 3.06 kWh lithium (4.9 tubular; each appliance counted for its own
+// hours since 2026-10-14), 1,377 W of panels.
 const flat: QuoteInput = {
   backupHours: 10,
   items: [
@@ -92,12 +93,13 @@ describe("buildSystems", () => {
   });
 
   it("leaves a brand out when it would take more than four battery strings", () => {
-    const tiny = lithium("tiny", "Felicity", 50_000, 1000);
+    // 3.06 kWh from 700 Wh packs takes five.
+    const tiny = lithium("tiny", "Felicity", 50_000, 700);
     expect(buildSystems(needs, parts({ inverters: [inverter("inv", "Felicity", 400_000)], batteries: [tiny] }), s)).toEqual([]);
   });
 
   it("wires 12 V tubular batteries in series to the inverter's voltage", () => {
-    // 24 V system: strings of two 2.4 kWh blocks; 6.92 kWh needed, so two strings.
+    // 24 V system: strings of two 2.4 kWh blocks; 4.9 kWh needed, so two strings.
     const [o] = buildSystems(needs, parts({ inverters: [inverter("inv", "Felicity", 400_000)], batteries: [tubular("t200", "Felicity", 250_000)] }), s);
     expect(o).toMatchObject({ chemistry: "tubular", batteryWh: 9600 });
     expect(o.lines[1].quantity).toBe(4);

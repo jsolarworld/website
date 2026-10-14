@@ -1,3 +1,4 @@
+import type { AccessoryLine } from "./accessories";
 import type { SystemOption } from "./systems";
 import type { Needs, PackageOption, QuoteResult } from "./types";
 
@@ -58,9 +59,19 @@ export interface QuoteView {
    * saved before 2026-10-11, when such appliances still counted towards the inverter and the panels.
    */
   leftOff?: string[];
+  /** The usual extras, outside every total (see `pickAccessories`). Missing on quotes saved before 2026-10-14. */
+  accessories?: AccessoryLine[];
 }
 
 const NO_SYSTEMS: BrandSystems = { systems: [], tooLarge: false, panel: null };
+
+/** "about 9.5 hours of backup", or, at 24 (see `hoursCovered`), that it lasts a whole day of the customer's own use. */
+export const backupPhrase = (hours: number) => (hours >= 24 ? "enough for a whole day of your use" : `about ${hours.toFixed(1)} hours of backup`);
+/** `backupPhrase` at the start of a sentence. */
+export const backupSentence = (hours: number) => {
+  const phrase = backupPhrase(hours);
+  return phrase[0].toUpperCase() + phrase.slice(1);
+};
 
 export function buildView(
   result: QuoteResult,

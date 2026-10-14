@@ -18,11 +18,12 @@ import {
   SpecFigure,
   buttonClass,
 } from "@/components/ui";
+import { AccessoriesList } from "./accessories-list";
 import { BrandSystems } from "./brand-systems";
 import { LeftOffNotice } from "./left-off-notice";
 import { saveQuoteAction } from "@/lib/quote/actions";
 import { CONSENT_ERROR, NOTHING_ON_ERROR, PHONE_ERROR } from "@/lib/quote/request";
-import type { QuoteView } from "@/lib/quote/view";
+import { backupSentence, type QuoteView } from "@/lib/quote/view";
 import { quoteSummary } from "@/lib/quote/summary";
 import { normalizeNgPhone } from "@/lib/phone";
 import { SITE, whatsappLink } from "@/lib/site";
@@ -516,7 +517,7 @@ function Results({
                 <h3 className="text-subtitle">{o.name}</h3>
                 <Price amount={o.priceNgn} size="lg" />
                 <p className="text-sm text-muted">
-                  {o.backupHours != null ? `About ${o.backupHours.toFixed(1)} hours of backup` : "Backup depends on your list"}
+                  {o.backupHours != null ? backupSentence(o.backupHours) : "Backup depends on your list"}
                   {o.label === "Budget" && o.backupHours != null && o.backupHours < view.backupHours && ` (less than the ${view.backupHours}h you asked for)`}
                 </p>
                 <ul className="space-y-1 text-sm">
@@ -545,6 +546,8 @@ function Results({
       )}
 
       <BrandSystems systems={systems} reference={saved} />
+
+      {(systems.length > 0 || view.options.length > 0) && <AccessoriesList lines={view.accessories} />}
 
       <Card>
         <CardBody className="space-y-4">

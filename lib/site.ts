@@ -2,7 +2,8 @@ export const SITE = {
   name: "J Solar World Energy",
   shortName: "J Solar World",
   slogan: "Reliable & Trusted Solar Energy Solutions",
-  url: process.env.NEXT_PUBLIC_SITE_URL ?? "https://j-solar-world.vercel.app",
+  // The www address is the main one (bought 2026-10-14); jsolarworld.com without www forwards to it.
+  url: process.env.NEXT_PUBLIC_SITE_URL ?? "https://www.jsolarworld.com",
   phones: ["09044871185", "08100362453"],
   whatsapp: "2349044871185",
   email: "Jsolarworld2@gmail.com",

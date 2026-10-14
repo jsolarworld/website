@@ -26,7 +26,9 @@ import {
 } from "@/components/ui";
 import { CATEGORY_ART_SLUGS, CategoryArt } from "@/components/category-art";
 import { ProductCard } from "@/components/product-card";
+import { AccessoriesList } from "@/components/quote/accessories-list";
 import { BrandSystems } from "@/components/quote/brand-systems";
+import { pickAccessories } from "@/lib/quote/accessories";
 import type { ProductCardData } from "@/lib/catalogue";
 import { APPLIANCES, itemFromAppliance } from "@/lib/quote/appliances";
 import { DEFAULT_SETTINGS } from "@/lib/quote/defaults";
@@ -113,6 +115,11 @@ const sampleSystems = buildSystems(
   },
   DEFAULT_SETTINGS,
 ).map((o, i) => ({ ...o, overBudget: i === 2 }));
+// Two made-up accessory products, one priced: the rest of the list has none yet, as in the shop today.
+const sampleAccessories = pickAccessories([
+  { name: "Surge Protector 40kA", slug: "surge-protector-40ka", price: 35_000, type: "Surge protector" },
+  { name: "MC4 Connector Pair", slug: "mc4-connector-pair", price: null, type: "" },
+]);
 
 const ramps = [
   {
@@ -618,6 +625,10 @@ export default function DesignSystemPage() {
 
           <div className="mt-12">
             <BrandSystems systems={sampleSystems} />
+          </div>
+
+          <div className="mt-10">
+            <AccessoriesList lines={sampleAccessories} />
           </div>
         </Container>
       </Section>

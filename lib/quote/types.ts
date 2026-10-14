@@ -53,11 +53,24 @@ export interface QuoteSettings {
   inverterPowerFactor: number;
 }
 
+/** What one appliance on the system asks of the battery. */
+export interface BackupDraw {
+  /** Average draw: watts × quantity × duty cycle. */
+  w: number;
+  hoursPerDay: number;
+}
+
 export interface Needs {
   peakW: number;
   surgeW: number;
   dailyWh: number;
+  /** Average draw of everything on the system together, after diversity. Zero when nothing runs on battery. */
   backupLoadW: number;
+  /**
+   * Each appliance on the system, for working out the battery and how long one lasts (see `outageWh`).
+   * Missing on quotes saved before 2026-10-14; only fresh quotes read it.
+   */
+  backupDraws: BackupDraw[];
   inverterContinuousW: number;
   inverterSurgeW: number;
   arrayW: number;

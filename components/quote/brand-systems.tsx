@@ -1,10 +1,12 @@
 import Link from "next/link";
 import { Badge, Card, CardBody, Eyebrow, Price, buttonClass } from "@/components/ui";
 import { fullyPriced } from "@/lib/quote/systems";
-import type { SystemView } from "@/lib/quote/view";
+import { backupPhrase, type SystemView } from "@/lib/quote/view";
 import { SITE, formatNaira, whatsappLink } from "@/lib/site";
 
 const KIND_LABEL = { set: "Inverter with battery", separate: "Inverter and separate battery" } as const;
+
+const pieces = (n: number) => `${n} ${n === 1 ? "piece" : "pieces"}`;
 
 /** What the customer sends us on WhatsApp: the exact parts, so nobody has to look the quote up. */
 function orderMessage(o: SystemView, reference?: string) {
@@ -50,11 +52,15 @@ export function BrandSystems({ systems, reference }: { systems: SystemView[]; re
                     <ul className="divide-y divide-line text-sm">
                       {o.lines.map((l) => (
                         <li key={l.slug} className="flex items-baseline justify-between gap-4 py-2">
-                          <span>
-                            <span className="numeric text-muted">{l.quantity} × </span>
+                          <span className="min-w-0">
                             <Link href={`/products/${l.slug}`} className="text-strong hover:underline">
                               {l.name}
                             </Link>
+                            {/* Pieces and the price of one, so the amount on the right can be checked. */}
+                            <span className="block text-xs text-muted numeric">
+                              {pieces(l.quantity)}
+                              {l.unitPriceNgn != null && ` × ${formatNaira(l.unitPriceNgn)}`}
+                            </span>
                           </span>
                           {l.unitPriceNgn != null ? (
                             <span className="numeric shrink-0">{formatNaira(l.unitPriceNgn * l.quantity)}</span>
@@ -64,8 +70,8 @@ export function BrandSystems({ systems, reference }: { systems: SystemView[]; re
                         </li>
                       ))}
                       <li className="flex items-baseline justify-between gap-4 py-2 text-muted">
-                        <span>Cables, breakers and mounting</span>
-                        <span className="shrink-0">Priced after a site visit</span>
+                        <span>Accessories and installation</span>
+                        <span className="shrink-0">Not in this total</span>
                       </li>
                     </ul>
 
@@ -84,7 +90,7 @@ export function BrandSystems({ systems, reference }: { systems: SystemView[]; re
                       )}
                       <p className="mt-1 text-sm text-muted">
                         {(o.batteryWh / 1000).toFixed(1)} kWh {o.chemistry} battery
-                        {o.backupHours != null && `, about ${o.backupHours.toFixed(1)} hours of backup`}
+                        {o.backupHours != null && `, ${backupPhrase(o.backupHours)}`}
                       </p>
                     </div>
 

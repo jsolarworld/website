@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { APPLIANCES, itemFromAppliance } from "./appliances";
 import { DEFAULT_SETTINGS } from "./defaults";
-import { backupHoursFor, computeNeeds, leftOff, matchPackages, quote } from "./engine";
+import { backupHoursFor, computeNeeds, hoursCovered, leftOff, matchPackages, outageWh, quote } from "./engine";
 import type { QuoteInput, QuotePackage } from "./types";
 
 const byId = (id: string) => APPLIANCES.find((a) => a.id === id)!;
@@ -49,9 +49,12 @@ describe("computeNeeds (PRD 7.4 worked example)", () => {
     expect(n.backupLoadW).toBeCloseTo(311.5);
   });
 
-  it("matches battery need for both chemistries", () => {
-    expect(n.batteryWh.lithium).toBeCloseTo(4326, 0);
-    expect(n.batteryWh.tubular).toBeCloseTo(6922, 0);
+  it("counts each appliance for its own hours, not the whole outage (changed from PRD 7.4 on 2026-10-14)", () => {
+    // PRD 7.4 ran everything for all 10 hours: 4,326 Wh lithium. Now the bulbs count 6 hours, the fans 8,
+    // the TV and decoder 5, the laptop 6, and only the router and fridge the full 10:
+    // (360 + 1,200 + 400 + 100 + 100 + 390 + 600) × 0.7 = 2,205 Wh, ÷ (0.8 × 0.9) lithium or ÷ (0.5 × 0.9) tubular.
+    expect(n.batteryWh.lithium).toBeCloseTo(3062.5, 1);
+    expect(n.batteryWh.tubular).toBeCloseTo(4900, 1);
   });
 
   it("matches the array need", () => {
@@ -93,10 +96,45 @@ describe("appliances left off the system", () => {
   });
 });
 
+describe("battery for an outage", () => {
+  const s = DEFAULT_SETTINGS;
+  const tv = { w: 80, hoursPerDay: 5 };
+  const fridge = { w: 60, hoursPerDay: 24 };
+
+  it("counts an appliance for its own hours, but never longer than the outage", () => {
+    expect(outageWh([tv], 12, s)).toBeCloseTo(80 * 5 * 0.7);
+    expect(outageWh([tv], 3, s)).toBeCloseTo(80 * 3 * 0.7);
+  });
+
+  it("is the PRD's figure when everything runs at least as long as the outage", () => {
+    const n = computeNeeds({ backupHours: 10, items: flat.items.filter((i) => i.hoursPerDay >= 10) }, s);
+    expect(n.batteryWh.lithium).toBeCloseTo((n.backupLoadW * 10) / (0.8 * 0.9));
+  });
+
+  it("works out the hours a battery lasts by the same rule", () => {
+    // 1 kWh lithium gives 720 Wh. The TV and fridge use 98 Wh an hour for 5 hours (490), then the fridge 42.
+    expect(hoursCovered(1000, "lithium", [tv, fridge], s)).toBeCloseTo(5 + 230 / 42, 5);
+    // ...and a battery sized for an outage covers that outage.
+    const n = computeNeeds({ ...flat, backupHours: 7 }, s);
+    expect(hoursCovered(n.batteryWh.lithium, "lithium", n.backupDraws, s)).toBeCloseTo(7, 5);
+  });
+
+  it("says 24 hours when the battery covers a whole day of use", () => {
+    expect(hoursCovered(100_000, "lithium", [tv, fridge], s)).toBe(24);
+  });
+});
+
 describe("backupHoursFor", () => {
-  it("gives about 11.5 h for a 5 kWh lithium package", () => {
+  it("covers a whole day of the flat's use with a 5 kWh lithium package", () => {
     const n = computeNeeds(flat, DEFAULT_SETTINGS);
-    expect(backupHoursFor(pkg({ id: "a", price: 1 }), n, DEFAULT_SETTINGS)).toBeCloseTo(11.56, 1);
+    expect(backupHoursFor(pkg({ id: "a", price: 1 }), n, DEFAULT_SETTINGS)).toBe(24);
+  });
+
+  it("gives part of a day for a smaller battery", () => {
+    // 2.6 kWh gives 1,872 Wh: 5 h at 311.5 Wh an hour, 1 h more at 241.5 once the TV and decoder are off,
+    // then 154 an hour once the bulbs and laptop are off too.
+    const n = computeNeeds(flat, DEFAULT_SETTINGS);
+    expect(backupHoursFor(pkg({ id: "a", price: 1, batteryWh: 2600 }), n, DEFAULT_SETTINGS)).toBeCloseTo(6 + 73 / 154, 5);
   });
 
   it("is null when nothing is on backup", () => {
@@ -168,7 +206,8 @@ describe("matchPackages (PRD 7.3)", () => {
   });
 
   it("rejects a budget package below the 60% battery floor", () => {
-    const tiny = pkg({ id: "tiny", price: 300_000, batteryWh: 2000 });
+    // 60% of 3,062.5 Wh is 1,837.5.
+    const tiny = pkg({ id: "tiny", price: 300_000, batteryWh: 1800 });
     const r = matchPackages(n, [tiny, fit], s);
     expect(r.budget).toBeNull();
   });
@@ -191,9 +230,10 @@ describe("matchPackages (PRD 7.3)", () => {
   });
 
   it("sizes tubular batteries with the lower depth of discharge", () => {
-    const tubular5k = pkg({ id: "t5", price: 700_000, chemistry: "tubular" });
+    // 4.5 kWh would be plenty as lithium (3,062.5 Wh), but tubular needs 4,900.
+    const tubular45 = pkg({ id: "t4.5", price: 700_000, chemistry: "tubular", batteryWh: 4500 });
     const tubular8k = pkg({ id: "t8", price: 900_000, chemistry: "tubular", batteryWh: 8000 });
-    const r = matchPackages(n, [tubular5k, tubular8k, fit], s, "tubular");
+    const r = matchPackages(n, [tubular45, tubular8k, fit], s, "tubular");
     expect(r.recommended?.package.id).toBe("t8");
   });
 

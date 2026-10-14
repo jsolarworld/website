@@ -4,6 +4,7 @@ import { db } from "../db";
 import { effectivePrice } from "../catalogue";
 import { DEFAULT_SETTINGS } from "./defaults";
 import { QUOTE_FIELDS } from "../admin/missing";
+import { ACCESSORY_CATEGORIES, pickAccessories, type AccessoryRow } from "./accessories";
 import { computeNeeds, leftOff, matchPackages } from "./engine";
 import { toParts, type PartRow } from "./parts";
 import type { Contact, QuoteRequest } from "./request";
@@ -84,8 +85,26 @@ export async function loadPartRows(): Promise<PartRow[]> {
   });
 }
 
+/** Published, available products from the accessory categories, for `pickAccessories`. */
+export async function loadAccessoryRows(): Promise<AccessoryRow[]> {
+  const rows = await db.product.findMany({
+    where: { kind: "PRODUCT", status: "PUBLISHED", category: { slug: { in: ACCESSORY_CATEGORIES } } },
+    select: { name: true, slug: true, priceNgn: true, salePriceNgn: true, stock: true, availableOnRequest: true, specs: true },
+  });
+  return rows.flatMap((r) => {
+    if (!r.availableOnRequest && r.stock <= 0) return [];
+    const type = (r.specs as Record<string, unknown> | null)?.type;
+    return [{ name: r.name, slug: r.slug, price: effectivePrice(r), type: typeof type === "string" ? type : "" }];
+  });
+}
+
 export async function runQuote(req: QuoteRequest, preloaded?: QuoteSettings): Promise<QuoteView> {
-  const [settings, { packages, meta }, rows] = await Promise.all([preloaded ?? loadSettings(), loadPackages(), loadPartRows()]);
+  const [settings, { packages, meta }, rows, accessoryRows] = await Promise.all([
+    preloaded ?? loadSettings(),
+    loadPackages(),
+    loadPartRows(),
+    loadAccessoryRows(),
+  ]);
   const parts = toParts(rows, settings.inverterPowerFactor);
   const needs = computeNeeds(req.input, settings);
   const result = matchPackages(needs, packages, settings, req.chemistry);
@@ -95,7 +114,7 @@ export async function runQuote(req: QuoteRequest, preloaded?: QuoteSettings): Pr
     tooLarge: tooLarge(needs, settings),
     panel: panel && { name: panel.name, slug: panel.slug, watts: panel.watts },
   });
-  return { ...view, leftOff: leftOff(req.input) };
+  return { ...view, leftOff: leftOff(req.input), accessories: pickAccessories(accessoryRows) };
 }
 
 // No 0/O/1/I so a reference read aloud over the phone isn't misheard.
