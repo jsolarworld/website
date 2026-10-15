@@ -1,5 +1,4 @@
 import type {
-  BackupDraw,
   Chemistry,
   Needs,
   PackageOption,
@@ -7,7 +6,17 @@ import type {
   QuotePackage,
   QuoteResult,
   QuoteSettings,
+  UsageTime,
 } from "./types";
+
+/**
+ * Sizing (the sizing spec of 2026-10-14, replacing PRD 7.2's formulas, which this file followed until then)
+ * works in two stages. `computeNeeds` works out the home's needs once from the appliance list: energy in a
+ * day, energy in the backup window, and power drawn at once, all AC. The functions below it turn those into
+ * a battery and solar watts for one inverter, using that inverter's efficiency and no-load draw. The page's
+ * headline uses the default inverter; each system in systems.ts uses its own. Every figure on the page comes
+ * from these functions, so the headline and the cards cannot contradict each other.
+ */
 
 const CHEMISTRIES: Chemistry[] = ["lithium", "tubular"];
 
@@ -15,86 +24,122 @@ const CHEMISTRIES: Chemistry[] = ["lithium", "tubular"];
 export const leftOff = (input: QuoteInput) => [...new Set(input.items.filter((i) => !i.onBackup).map((i) => i.name))];
 
 /**
- * Wh the battery has to give over an outage of `hours`. Decided 2026-10-14, after customers found the
- * battery, and so the quote, too high: each appliance counts for its own hours a day, never longer than
- * the outage. PRD 7.2 counted every appliance for the whole outage, so a TV watched 5 hours a day was
- * sized as if it ran for all 12. The diversity factor still applies.
+ * How many of an appliance's hours fall inside a backup window of `backupHours` (B, at most 24). Used at
+ * night, all of them, up to B. In the day, only those that spill over from the 24 − B hours of daylight or
+ * grid. Both, spread evenly. So the backup energy is never more than the day's, and equals it when B is 24.
  */
-export function outageWh(draws: BackupDraw[], hours: number, s: QuoteSettings): number {
-  return s.diversityFactor * draws.reduce((sum, d) => sum + d.w * Math.min(d.hoursPerDay, hours), 0);
+export function hoursInBackup(hoursPerDay: number, usage: UsageTime, backupHours: number): number {
+  const h = Math.min(hoursPerDay, 24);
+  const b = Math.min(backupHours, 24);
+  if (usage === "day") return Math.max(0, h - (24 - b));
+  if (usage === "both") return (h * b) / 24;
+  return Math.min(h, b);
+}
+
+/** An inverter's own losses: its efficiency, and the watts it draws with nothing switched on. */
+export interface InverterProfile {
+  efficiency: number;
+  idleW: number;
+}
+
+/** The inverter the headline is worked out with, and the stand-in for figures a datasheet leaves out. */
+export const defaultProfile = (s: QuoteSettings): InverterProfile => ({ efficiency: s.inverterEfficiency, idleW: s.inverterIdleW });
+
+type Energy = Pick<Needs, "dailyWh" | "backupWh" | "backupHours" | "peakSunHours">;
+
+/** What the battery gives over the backup window: the load through the inverter, plus the inverter idling all of it. */
+export const backupDcWh = (n: Energy, p: InverterProfile) => n.backupWh / p.efficiency + p.idleW * n.backupHours;
+
+/** A day's use as the battery and panels see it, idling included. */
+export const dailyDcWh = (n: Energy, p: InverterProfile) => n.dailyWh / p.efficiency + p.idleW * 24;
+
+/** Battery nameplate that carries the backup window without going below the chemistry's depth of discharge. */
+export const batteryNameplateWh = (n: Energy, p: InverterProfile, chemistry: Chemistry, s: QuoteSettings) =>
+  backupDcWh(n, p) / s.depthOfDischarge[chemistry];
+
+/**
+ * Solar watts that cover a day's use, plus what is lost putting the night's energy into the battery and
+ * taking it out. It depends on use, not on the size of the battery.
+ */
+export const pvNeededW = (n: Energy, p: InverterProfile, chemistry: Chemistry, s: QuoteSettings) =>
+  (dailyDcWh(n, p) + backupDcWh(n, p) * (1 / s.roundTrip[chemistry] - 1)) / (n.peakSunHours * s.pvDerate);
+
+/**
+ * How long a battery of `nameplateWh` carries the backup load: hours, which come to exactly B for a battery
+ * at its target, and with more than a whole day's use stored, the number of days too. Null when nothing
+ * on the list runs during the backup window.
+ */
+export function batteryLasts(
+  nameplateWh: number,
+  chemistry: Chemistry,
+  n: Energy,
+  p: InverterProfile,
+  s: QuoteSettings,
+): { hours: number; days: number | null } | null {
+  if (n.backupWh <= 0) return null;
+  const usable = nameplateWh * s.depthOfDischarge[chemistry];
+  const hours = usable / (backupDcWh(n, p) / n.backupHours);
+  const daily = dailyDcWh(n, p);
+  return { hours, days: hours > 24 && usable >= daily ? usable / daily : null };
 }
 
 /**
- * How many hours of outage a battery covers, by the same rule as `outageWh`. 24 means a whole day: every
- * appliance has had its full day's use. Null when nothing runs on battery.
- */
-export function hoursCovered(batteryWh: number, chemistry: Chemistry, draws: BackupDraw[], s: QuoteSettings): number | null {
-  const running = draws.filter((d) => d.w > 0 && d.hoursPerDay > 0);
-  if (running.length === 0) return null;
-  const usable = batteryWh * s.depthOfDischarge[chemistry] * s.inverterEfficiency;
-  // The energy used climbs in straight lines between the hours at which appliances are done for the day.
-  const stops = [...new Set([0, ...running.map((d) => Math.min(d.hoursPerDay, 24)), 24])].sort((a, b) => a - b);
-  for (let k = 1; k < stops.length; k++) {
-    const from = stops[k - 1];
-    const used = outageWh(running, from, s);
-    const perHour = s.diversityFactor * running.filter((d) => d.hoursPerDay > from).reduce((sum, d) => sum + d.w, 0);
-    if (used + perHour * (stops[k] - from) >= usable) return perHour > 0 ? from + (usable - used) / perHour : from;
-  }
-  return 24;
-}
-
-/**
- * PRD 7.2: what the home needs, before looking at any package. Since 2026-10-11 a heavy appliance the
- * customer leaves unticked is left out of every figure, not only the battery: counting cookers, heaters
- * and pumps towards the inverter made an ordinary household list need more than anything in the shop.
+ * Stage 1: what the home needs, from the appliances the system powers. A heavy appliance the customer leaves
+ * unticked is left out of every figure (decided 2026-10-11). The battery and solar figures use the default
+ * inverter, and `s.peakSunHours` is the customer's own (see sun.ts).
  */
 export function computeNeeds(input: QuoteInput, s: QuoteSettings): Needs {
   let peakW = 0;
   let largestStartupExtraW = 0;
   let dailyWh = 0;
-  let backupSumW = 0;
+  let backupWh = 0;
   let highDrawOnBackup = false;
-  const backupDraws: BackupDraw[] = [];
 
   for (const item of input.items) {
     if (!item.onBackup) continue;
-    const load = item.watts * item.quantity;
-    peakW += load;
-    // Only one motor is assumed to start at a time, so take the largest single extra.
+    const averageW = item.watts * item.quantity * item.dutyCycle;
+    peakW += item.watts * item.quantity;
+    // One motor starts at a time, so take the largest single extra.
     largestStartupExtraW = Math.max(largestStartupExtraW, item.watts * (item.surge - 1));
-    dailyWh += load * item.hoursPerDay * item.dutyCycle;
-    backupSumW += load * item.dutyCycle;
-    backupDraws.push({ w: load * item.dutyCycle, hoursPerDay: item.hoursPerDay });
+    dailyWh += averageW * Math.min(item.hoursPerDay, 24);
+    backupWh += averageW * hoursInBackup(item.hoursPerDay, item.usageTime ?? "night", input.backupHours);
     if (item.highDraw) highDrawOnBackup = true;
   }
 
-  const backupLoadW = backupSumW * s.diversityFactor;
-  const surgeW = peakW + largestStartupExtraW;
-
+  const energy: Energy = { dailyWh, backupWh, backupHours: input.backupHours, peakSunHours: s.peakSunHours };
+  const profile = defaultProfile(s);
   const batteryWh = {} as Record<Chemistry, number>;
+  const pvW = {} as Record<Chemistry, number>;
   for (const chem of CHEMISTRIES) {
-    batteryWh[chem] = outageWh(backupDraws, input.backupHours, s) / (s.depthOfDischarge[chem] * s.inverterEfficiency);
+    batteryWh[chem] = batteryNameplateWh(energy, profile, chem, s);
+    pvW[chem] = pvNeededW(energy, profile, chem, s);
   }
+  const surgeW = peakW + largestStartupExtraW;
 
   return {
     peakW,
     surgeW,
     dailyWh,
-    backupLoadW,
-    backupDraws,
+    backupWh,
     inverterContinuousW: peakW * s.inverterSafetyMargin,
     inverterSurgeW: surgeW,
-    // PRD 7.2 sizes the array for a day's energy. Since 2026-10-11 it must also carry everything running
-    // at once in full sun, so daytime use does not drain the battery. Engineers confirm both.
-    arrayW: Math.max(dailyWh / s.peakSunHours, peakW) / s.systemDerate,
+    arrayW: pvW.lithium,
+    pvW,
     batteryWh,
     highDrawOnBackup,
+    backupHours: input.backupHours,
+    peakSunHours: s.peakSunHours,
   };
 }
 
-/** Hours of outage a package's battery covers (see `hoursCovered`). */
-export const backupHoursFor = (pkg: QuotePackage, needs: Needs, s: QuoteSettings): number | null =>
-  hoursCovered(pkg.batteryWh, pkg.chemistry, needs.backupDraws, s);
+/** How long a package's battery lasts, with the default inverter (packages carry no datasheet figures). */
+function packageOption(pkg: QuotePackage, needs: Needs, s: QuoteSettings): PackageOption {
+  const lasts = batteryLasts(pkg.batteryWh, pkg.chemistry, needs, defaultProfile(s), s);
+  return { package: pkg, backupHours: lasts?.hours ?? null, backupDays: lasts?.days ?? null };
+}
+
+/** Hours a package's battery carries the backup load (see `batteryLasts`). */
+export const backupHoursFor = (pkg: QuotePackage, needs: Needs, s: QuoteSettings): number | null => packageOption(pkg, needs, s).backupHours;
 
 function meetsInverter(pkg: QuotePackage, needs: Needs): boolean {
   return (
@@ -107,7 +152,7 @@ function meetsAll(pkg: QuotePackage, needs: Needs): boolean {
   return (
     meetsInverter(pkg, needs) &&
     pkg.batteryWh >= needs.batteryWh[pkg.chemistry] &&
-    pkg.arrayW >= needs.arrayW
+    pkg.arrayW >= needs.pvW[pkg.chemistry]
   );
 }
 
@@ -122,8 +167,7 @@ export function matchPackages(
     .filter((p) => p.approved && (!chemistry || p.chemistry === chemistry))
     .sort((a, b) => a.price - b.price || a.id.localeCompare(b.id));
 
-  const option = (pkg: QuotePackage | undefined): PackageOption | null =>
-    pkg ? { package: pkg, backupHours: backupHoursFor(pkg, needs, s) } : null;
+  const option = (pkg: QuotePackage | undefined): PackageOption | null => (pkg ? packageOption(pkg, needs, s) : null);
 
   const fits = pool.filter((p) => meetsAll(p, needs));
   const recommended = fits[0];

@@ -15,6 +15,10 @@ const LITHIUM: SpecField[] = [
   { key: "capacityAh", label: "Capacity", unit: "Ah" },
 ];
 
+// Every datasheet figure entered, so the tests below see only the gaps they are about.
+const DATASHEET = { efficiency: 93, idleW: 50, maxChargeA: 120, pvMaxW: 6500, pvMaxVoc: 500, mpptMinV: 120, mpptMaxV: 450, mpptCount: 1, pvMaxIscA: 22 };
+const BATTERY_DATASHEET = { maxChargeA: 100, maxDischargeA: 100, maxParallel: 15 };
+
 const product = (over: Partial<MissingInput>): MissingInput => ({
   kind: "PRODUCT",
   priceNgn: 1_000_000,
@@ -22,7 +26,7 @@ const product = (over: Partial<MissingInput>): MissingInput => ({
   mediaCount: 1,
   categorySlug: "inverters",
   specTemplate: INVERTER,
-  specs: { ratedContinuousW: 6000, surgeW: 12000, systemVoltage: 48 },
+  specs: { ...DATASHEET, ratedContinuousW: 6000, surgeW: 12000, systemVoltage: 48 },
   ...over,
 });
 
@@ -33,7 +37,7 @@ describe("missingDetails", () => {
   });
 
   it("lists price and photo first, then the ratings the quote tool reads", () => {
-    const p = product({ priceNgn: null, mediaCount: 0, specs: { ratedKva: 6, type: "Hybrid" } });
+    const p = product({ priceNgn: null, mediaCount: 0, specs: { ...DATASHEET, ratedKva: 6, type: "Hybrid" } });
     expect(missingDetails(p)).toEqual(["price", "photo", "rated continuous power (W)", "surge power (W)", "system voltage (V)"]);
   });
 
@@ -48,25 +52,25 @@ describe("missingDetails", () => {
   });
 
   it("still asks staff for the surge rating, though the quote tool can work without it", () => {
-    const noSurge = product({ specs: { ratedContinuousW: 6000, systemVoltage: 48 } });
+    const noSurge = product({ specs: { ...DATASHEET, ratedContinuousW: 6000, systemVoltage: 48 } });
     expect(missingDetails(noSurge)).toEqual(["surge power (W)"]);
     expect(lacksQuoteDetails(noSurge)).toBe(false);
     expect(lacksQuoteDetails(product({ specs: { surgeW: 12000, systemVoltage: 48 } }))).toBe(true);
   });
 
   it("lets the quote tool use an inverter that has only its kVA figure, and still asks for the watts", () => {
-    const kvaOnly = product({ specs: { ratedKva: 6, systemVoltage: 48 } });
+    const kvaOnly = product({ specs: { ...DATASHEET, ratedKva: 6, systemVoltage: 48 } });
     expect(lacksQuoteDetails(kvaOnly)).toBe(false);
     expect(missingDetails(kvaOnly)).toEqual(["rated continuous power (W)", "surge power (W)"]);
     expect(lacksQuoteDetails(product({ specs: { ratedKva: 6 } }))).toBe(true);
   });
 
   it("treats an empty or zero rating as missing", () => {
-    expect(missingDetails(product({ specs: { ratedContinuousW: 0, surgeW: "", systemVoltage: 48 } }))).toEqual(["rated continuous power (W)", "surge power (W)"]);
+    expect(missingDetails(product({ specs: { ...DATASHEET, ratedContinuousW: 0, surgeW: "", systemVoltage: 48 } }))).toEqual(["rated continuous power (W)", "surge power (W)"]);
   });
 
   it("accepts a lithium battery's capacity in kWh or in Ah", () => {
-    const battery = (specs: object) => product({ categorySlug: "lithium-batteries", specTemplate: LITHIUM, specs });
+    const battery = (specs: object) => product({ categorySlug: "lithium-batteries", specTemplate: LITHIUM, specs: { ...BATTERY_DATASHEET, ...specs } });
     expect(missingDetails(battery({ capacityAh: 100, voltage: 12 }))).toEqual([]);
     expect(missingDetails(battery({ capacityKwh: 10, voltage: 51.2 }))).toEqual([]);
     expect(missingDetails(battery({ voltage: 48 }))).toEqual(["capacity (kWh or Ah)"]);
@@ -74,7 +78,7 @@ describe("missingDetails", () => {
 
   it("does not need a brand on a solar panel", () => {
     const panel = product({ categorySlug: "solar-panels", specTemplate: [{ key: "watts", label: "Power", unit: "W" }], brandId: null, specs: {} });
-    expect(missingDetails(panel)).toEqual(["power (W)"]);
+    expect(missingDetails(panel)).toEqual(["power (W)", "Voc, Vmp and Isc"]);
   });
 
   it("only asks for price and photo on products the quote tool does not read", () => {
@@ -87,8 +91,15 @@ describe("missingDetails", () => {
     expect(lacksQuoteDetails(product({ kind: "PACKAGE", specs: {} }))).toBe(false);
   });
 
+  it("asks for the datasheet figures in groups, though the quote tool can work without them", () => {
+    const plain = product({ specs: { ratedContinuousW: 6000, surgeW: 12000, systemVoltage: 48, pvMaxW: 6500 } });
+    expect(missingDetails(plain)).toEqual(["efficiency and no-load consumption", "solar input limits", "max battery charge current"]);
+    expect(lacksQuoteDetails(plain)).toBe(false);
+  });
+
   it("copes with specs that are not an object", () => {
-    expect(missingDetails(product({ specs: null }))).toHaveLength(3);
+    // Three ratings and three datasheet groups.
+    expect(missingDetails(product({ specs: null }))).toHaveLength(6);
   });
 });
 

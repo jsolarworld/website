@@ -14,6 +14,19 @@ type Spec = { key: string; label: string; unit?: string; filterable?: boolean };
 const num = (key: string, label: string, unit: string, filterable = true): Spec => ({ key, label, unit, filterable });
 const text = (key: string, label: string, filterable = false): Spec => ({ key, label, filterable });
 
+// Datasheet figures the quote's checks read (sizing spec, 2026-10-14). All optional: a check runs only once its figures are entered.
+const INVERTER_DATASHEET: Spec[] = [
+  num("efficiency", "Efficiency", "%", false),
+  num("idleW", "No-load consumption", "W", false),
+  num("maxChargeA", "Max battery charge current", "A", false),
+  num("pvMaxW", "Max solar input power", "W", false),
+  num("pvMaxVoc", "Max solar input voltage", "V", false),
+  num("mpptMinV", "MPPT range from", "V", false),
+  num("mpptMaxV", "MPPT range to", "V", false),
+  num("mpptCount", "Solar charge inputs", "MPPT", false),
+  num("pvMaxIscA", "Max solar current per input", "A", false),
+];
+
 // Spec fields per category. `ratedContinuousW` on inverters is what the quote engine checks, not the kVA in the name.
 const CATEGORIES: { slug: string; name: string; specTemplate: Spec[] }[] = [
   {
@@ -25,6 +38,7 @@ const CATEGORIES: { slug: string; name: string; specTemplate: Spec[] }[] = [
       num("surgeW", "Surge power", "W", false),
       num("systemVoltage", "System voltage", "V"),
       text("type", "Type", true),
+      ...INVERTER_DATASHEET,
     ],
   },
   {
@@ -38,6 +52,7 @@ const CATEGORIES: { slug: string; name: string; specTemplate: Spec[] }[] = [
       num("batteryKwh", "Battery capacity", "kWh"),
       num("systemVoltage", "Battery voltage", "V"),
       text("type", "Type", true),
+      ...INVERTER_DATASHEET,
     ],
   },
   {
@@ -48,17 +63,20 @@ const CATEGORIES: { slug: string; name: string; specTemplate: Spec[] }[] = [
       num("voltage", "Voltage", "V"),
       num("capacityAh", "Capacity", "Ah", false),
       text("cells", "Cell type"),
+      num("maxChargeA", "Max charge current", "A", false),
+      num("maxDischargeA", "Max discharge current", "A", false),
+      num("maxParallel", "Most that can be joined in parallel", "units", false),
     ],
   },
   {
     slug: "tubular-batteries",
     name: "Tubular Batteries",
-    specTemplate: [num("capacityAh", "Capacity", "Ah"), num("voltage", "Voltage", "V")],
+    specTemplate: [num("capacityAh", "Capacity", "Ah"), num("voltage", "Voltage", "V"), num("maxChargeA", "Max charge current", "A", false)],
   },
   {
     slug: "drycell-batteries",
     name: "Drycell Batteries",
-    specTemplate: [num("capacityAh", "Capacity", "Ah"), num("voltage", "Voltage", "V"), text("type", "Type", true)],
+    specTemplate: [num("capacityAh", "Capacity", "Ah"), num("voltage", "Voltage", "V"), text("type", "Type", true), num("maxChargeA", "Max charge current", "A", false)],
   },
   {
     slug: "solar-water-heaters",
@@ -78,7 +96,13 @@ const CATEGORIES: { slug: string; name: string; specTemplate: Spec[] }[] = [
   {
     slug: "solar-panels",
     name: "Solar Panels",
-    specTemplate: [num("watts", "Power", "W"), text("type", "Cell type", true), num("voltageVmp", "Vmp", "V", false)],
+    specTemplate: [
+      num("watts", "Power", "W"),
+      text("type", "Cell type", true),
+      num("voltageVmp", "Vmp", "V", false),
+      num("voltageVoc", "Voc", "V", false),
+      num("currentIsc", "Isc", "A", false),
+    ],
   },
   {
     slug: "solar-street-lights",

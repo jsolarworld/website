@@ -8,6 +8,7 @@ import { ACCESSORY_CATEGORIES, pickAccessories, type AccessoryRow } from "./acce
 import { computeNeeds, leftOff, matchPackages } from "./engine";
 import { toParts, type PartRow } from "./parts";
 import type { Contact, QuoteRequest } from "./request";
+import { sunHoursFor } from "./sun";
 import { buildSystems, pickPanel, tooLarge } from "./systems";
 import type { Chemistry, QuotePackage, QuoteSettings } from "./types";
 import { buildView, type PackageMeta, type QuoteView } from "./view";
@@ -21,6 +22,7 @@ export async function loadSettings(): Promise<QuoteSettings> {
     ...DEFAULT_SETTINGS,
     ...stored,
     depthOfDischarge: { ...DEFAULT_SETTINGS.depthOfDischarge, ...stored.depthOfDischarge },
+    roundTrip: { ...DEFAULT_SETTINGS.roundTrip, ...stored.roundTrip },
   };
 }
 
@@ -99,12 +101,14 @@ export async function loadAccessoryRows(): Promise<AccessoryRow[]> {
 }
 
 export async function runQuote(req: QuoteRequest, preloaded?: QuoteSettings): Promise<QuoteView> {
-  const [settings, { packages, meta }, rows, accessoryRows] = await Promise.all([
+  const [stored, { packages, meta }, rows, accessoryRows] = await Promise.all([
     preloaded ?? loadSettings(),
     loadPackages(),
     loadPartRows(),
     loadAccessoryRows(),
   ]);
+  // The customer's own sun hours, by state; the South's figure (the lowest) when none is given.
+  const settings = { ...stored, peakSunHours: sunHoursFor(req.state, stored.peakSunHours) };
   const parts = toParts(rows, settings.inverterPowerFactor);
   const needs = computeNeeds(req.input, settings);
   const result = matchPackages(needs, packages, settings, req.chemistry);

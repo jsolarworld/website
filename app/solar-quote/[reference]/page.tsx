@@ -8,7 +8,7 @@ import { LeftOffNotice } from "@/components/quote/left-off-notice";
 import { getSavedQuote, isExpired } from "@/lib/quote/service";
 import { quoteSummary } from "@/lib/quote/summary";
 import type { QuoteItem } from "@/lib/quote/types";
-import { backupSentence, type QuoteView } from "@/lib/quote/view";
+import { backupSentence, inverterKw, solarKw, type QuoteView } from "@/lib/quote/view";
 import { SITE, formatNaira, whatsappLink } from "@/lib/site";
 
 type Props = { params: Promise<{ reference: string }> };
@@ -59,10 +59,17 @@ export default async function SavedQuotePage({ params }: Props) {
 
       <Panel className="mt-8 p-6 sm:p-8">
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-          <SpecFigure onChassis label="Inverter" value={Math.ceil(n.inverterContinuousW).toLocaleString("en-NG")} unit="W or more" />
+          <SpecFigure onChassis label="Inverter" value={inverterKw(n.inverterContinuousW)} unit="kW or more" />
           <SpecFigure onChassis label="Used per day" value={(n.dailyWh / 1000).toFixed(1)} unit="kWh" />
           <SpecFigure onChassis label={`Battery for ${view.backupHours}h`} value={(n.batteryWh.lithium / 1000).toFixed(1)} unit="kWh lithium" note={`or ${(n.batteryWh.tubular / 1000).toFixed(1)} kWh tubular`} />
-          <SpecFigure onChassis label="Solar array" value={Math.round(n.arrayW).toLocaleString("en-NG")} unit="W" />
+          <SpecFigure
+            onChassis
+            label="Solar"
+            value={solarKw(n.arrayW)}
+            unit="kW"
+            // Quotes saved before 2026-10-15 carry no sun hours.
+            note={n.peakSunHours ? `for ${n.peakSunHours} sun hours a day` : undefined}
+          />
         </div>
       </Panel>
 
@@ -86,6 +93,9 @@ export default async function SavedQuotePage({ params }: Props) {
                     <td className="px-4 py-2.5">
                       <span className={i.onBackup ? "text-strong" : "text-muted"}>{i.name}</span>
                       {!i.onBackup && <span className="block text-xs text-muted">Stays on NEPA or generator</span>}
+                      {i.onBackup && i.usageTime && i.usageTime !== "night" && (
+                        <span className="block text-xs text-muted">{i.usageTime === "day" ? "Used mostly in the daytime" : "Used day and night"}</span>
+                      )}
                     </td>
                     <td className="numeric px-4 py-2.5 text-right">{i.quantity}</td>
                     <td className="numeric px-4 py-2.5 text-right">{i.watts.toLocaleString("en-NG")}</td>
@@ -117,7 +127,7 @@ export default async function SavedQuotePage({ params }: Props) {
                 <Badge tone={o.label === "Recommended" ? "solar" : "neutral"}>{o.label}</Badge>
                 <h2 className="text-subtitle">{o.name}</h2>
                 <Price amount={o.priceNgn} size="lg" />
-                {o.backupHours != null && <p className="text-sm text-muted">{backupSentence(o.backupHours)}</p>}
+                {o.backupHours != null && <p className="text-sm text-muted">{backupSentence(o.backupHours, o.backupDays)}</p>}
                 <ul className="space-y-1 text-sm">
                   {o.components.map((c) => (
                     <li key={c.slug} className="flex justify-between gap-3">
@@ -134,7 +144,7 @@ export default async function SavedQuotePage({ params }: Props) {
 
       {systems.length > 0 && (
         <div className="mt-8">
-          <BrandSystems systems={systems} reference={quote.reference} />
+          <BrandSystems systems={systems} reference={quote.reference} backupHours={view.backupHours} />
         </div>
       )}
 

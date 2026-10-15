@@ -6,7 +6,7 @@ import { saveProduct, type FormState } from "@/app/admin/products/actions";
 import { Button, Card, CardBody, Eyebrow, Field, Input, Notice, Select, Textarea } from "@/components/ui";
 import { ComponentsField, type ComponentOption, type ComponentRow } from "./components-field";
 import { MediaField, type MediaItem } from "./media-field";
-import { brandNeeded, quoteSpecKeys } from "@/lib/admin/missing";
+import { brandNeeded, datasheetKeys, quoteSpecKeys } from "@/lib/admin/missing";
 import { NEW_BRAND, type SpecField } from "@/lib/admin/product-form";
 import { ACCESSORY_CATEGORIES, ACCESSORY_KINDS } from "@/lib/quote/accessories";
 
@@ -55,6 +55,7 @@ interface Props {
 }
 
 const QUOTE_HINT = "Needed by the quote tool";
+const DATASHEET_HINT = "From the datasheet: the quote checks the wiring and currents with it";
 
 export function ProductForm({ initial, categories, brands, componentOptions, canApprove, isEdit }: Props) {
   const [state, action, pending] = useActionState<FormState, FormData>(saveProduct, {});
@@ -159,7 +160,7 @@ export function ProductForm({ initial, categories, brands, componentOptions, can
                   label={f.unit ? `${f.label} (${f.unit})` : f.label}
                   required={false}
                   error={e[`spec.${f.key}`]}
-                  hint={quoteKeys.includes(f.key) ? QUOTE_HINT : undefined}
+                  hint={quoteKeys.includes(f.key) ? QUOTE_HINT : datasheetKeys(category?.slug ?? "").includes(f.key) ? DATASHEET_HINT : undefined}
                 >
                   {(p) => <Input {...p} inputMode={f.unit ? "decimal" : "text"} defaultValue={String(initial.specs[f.key] ?? "")} />}
                 </Field>

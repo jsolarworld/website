@@ -20,6 +20,7 @@ describe("parseQuoteRequest", () => {
     ["hours over 24", { ...base, items: [{ ...item, hoursPerDay: 30 }] }],
     ["NaN watts", { ...base, items: [{ ...item, watts: NaN }] }],
     ["bad backup hours", { ...base, backupHours: 0 }],
+    ["backup longer than a day", { ...base, backupHours: 30 }],
     ["nothing left on the system", { ...base, items: [{ ...item, highDraw: true, onBackup: false }] }],
   ])("rejects %s", (_name, raw) => {
     expect(parseQuoteRequest(raw).ok).toBe(false);
@@ -28,6 +29,11 @@ describe("parseQuoteRequest", () => {
   it("drops an unknown chemistry instead of trusting it", () => {
     const r = parseQuoteRequest({ ...base, chemistry: "nuclear" });
     expect(r.ok && r.data.chemistry).toBeUndefined();
+  });
+
+  it("keeps a known usage time and counts anything else as night", () => {
+    const r = parseQuoteRequest({ ...base, items: [{ ...item, usageTime: "day" }, { ...item, usageTime: "noon" }, item] });
+    expect(r.ok && r.data.input.items.map((i) => i.usageTime)).toEqual(["day", "night", "night"]);
   });
 
   it("does not let extra fields through", () => {

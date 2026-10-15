@@ -38,7 +38,7 @@ describe("quoteSummary", () => {
     expect(lines.filter((l) => l.startsWith("Felicity:"))).toHaveLength(1);
     expect(text).toContain("Felicity: ₦1,500,000 (1 x Felicity inverter, 2 x Panel 650W)");
     expect(text).toContain("Deye: ₦2,000,000");
-    expect(text).toContain("priced after a site visit");
+    expect(text).toContain("accessories and installation are not included");
     expect(text).not.toContain("Next step: site inspection");
   });
 

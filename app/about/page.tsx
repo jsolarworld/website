@@ -132,6 +132,17 @@ export default async function AboutPage() {
                     </a>
                   </dd>
                 </div>
+                <div>
+                  <dt className="text-muted">Follow us</dt>
+                  <dd className="mt-0.5 flex flex-wrap gap-x-4 gap-y-1 font-medium text-strong">
+                    {SITE.socials.map((s) => (
+                      <a key={s.name} href={s.url} target="_blank" rel="noopener noreferrer" className="hover:underline">
+                        {s.name}
+                        {s.handle && <span className="font-normal text-muted"> {s.handle}</span>}
+                      </a>
+                    ))}
+                  </dd>
+                </div>
               </dl>
               <div className="mt-6 overflow-hidden rounded-lg border border-line">
                 <iframe

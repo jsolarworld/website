@@ -25,7 +25,7 @@ export function quoteSummary(view: QuoteView, reference?: string, url?: string):
     const price = fullyPriced(o) ? formatNaira(o.totalNgn) : o.totalNgn > 0 ? `${formatNaira(o.totalNgn)} plus items priced on request` : "price on request";
     lines.push(`${brand}: ${price} (${o.lines.map((l) => `${l.quantity} x ${l.name}`).join(", ")})`);
   }
-  if (brands.length > 0) lines.push("Cables, breakers and mounting are priced after a site visit.");
+  if (brands.length > 0) lines.push("Equipment only: accessories and installation are not included.");
   if (view.options.length === 0 && systems.length === 0) lines.push("Next step: site inspection to size your system.");
   if (url) lines.push(url);
   return lines.join("\n");

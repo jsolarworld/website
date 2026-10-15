@@ -19,6 +19,8 @@ export interface OptionView {
   chemistry: "lithium" | "tubular";
   /** Null when nothing was set to run on battery. */
   backupHours: number | null;
+  /** With more than a whole day's use stored: days of normal use. Missing on quotes saved before 2026-10-15. */
+  backupDays?: number | null;
   inverterContinuousW: number;
   batteryWh: number;
   arrayW: number;
@@ -65,13 +67,28 @@ export interface QuoteView {
 
 const NO_SYSTEMS: BrandSystems = { systems: [], tooLarge: false, panel: null };
 
-/** "about 9.5 hours of backup", or, at 24 (see `hoursCovered`), that it lasts a whole day of the customer's own use. */
-export const backupPhrase = (hours: number) => (hours >= 24 ? "enough for a whole day of your use" : `about ${hours.toFixed(1)} hours of backup`);
+/**
+ * How long a battery lasts, in words (sizing spec 5): "about 9.5 hours of backup", and with more than a
+ * whole day's use stored "about 3.7 days of your normal use". Given the hours asked for, a battery that
+ * falls short says so. Quotes saved before 2026-10-15 carry no days, so there 24 hours or more stays in hours.
+ */
+export function backupPhrase(hours: number, days?: number | null, askedHours?: number): string {
+  if (days != null) return `about ${days.toFixed(1)} days of your normal use`;
+  if (hours >= 24) return "more than 24 hours of backup";
+  // A battery at its target gives exactly the hours asked for; the margin keeps rounding from calling it short.
+  const short = askedHours != null && hours < askedHours - 0.05;
+  return `about ${hours.toFixed(1)} hours of backup${short ? `, short of your ${askedHours} hours` : ""}`;
+}
 /** `backupPhrase` at the start of a sentence. */
-export const backupSentence = (hours: number) => {
-  const phrase = backupPhrase(hours);
+export const backupSentence = (...args: Parameters<typeof backupPhrase>) => {
+  const phrase = backupPhrase(...args);
   return phrase[0].toUpperCase() + phrase.slice(1);
 };
+
+/** The inverter a home needs, rounded up to the next half kilowatt (sizing spec 5): 2,407 W is "2.5". */
+export const inverterKw = (w: number) => (Math.ceil(w / 500) / 2).toFixed(1);
+/** Solar watts in kilowatts to one decimal: 4,207 W is "4.2". */
+export const solarKw = (w: number) => (w / 1000).toFixed(1);
 
 export function buildView(
   result: QuoteResult,
@@ -93,6 +110,7 @@ export function buildView(
         priceNgn: o.package.price,
         chemistry: o.package.chemistry,
         backupHours: o.backupHours,
+        backupDays: o.backupDays,
         inverterContinuousW: o.package.inverterContinuousW,
         batteryWh: o.package.batteryWh,
         arrayW: o.package.arrayW,

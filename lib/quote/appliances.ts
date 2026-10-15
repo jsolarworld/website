@@ -1,12 +1,16 @@
-import type { Appliance, QuoteItem } from "./types";
+import type { Appliance, QuoteItem, UsageTime } from "./types";
 
 type Row = [id: string, name: string, category: Appliance["category"], watts: number, duty: number, surge: number, highDraw?: true];
 
-// PRD 7.5 starter values. Typical ratings only: engineers confirm them before launch.
+// PRD 7.5 starter values. Typical ratings only: engineers confirm them before launch. The duty and surge
+// factors of fridges and freezers, air conditioners, the washing machine and the pressing iron follow the
+// sizing spec of 2026-10-14. Duty is the average share of the rated watts drawn while switched on (a fridge
+// compressor cycles, an inverter AC throttles down once the room is cool); a fridge's hours are the hours it
+// is switched on, usually 24, not the compressor's run time.
 // Added for the owner on 2026-10-03 (not in the PRD; engineers confirm these too): the large freezer,
 // both inverter air conditioners, the 1 HP and 1.5 HP pumps and the instant shower heater. Pumps that big
-// start off the system like the heaters: on battery, a pump used for an hour would size the battery as if
-// it ran all night. Since 2026-10-11 "off" means left out of the inverter and the panels too (see engine.ts).
+// start off the system like the heaters: their start-up alone asks for a much bigger inverter. Since
+// 2026-10-11 "off" means left out of the inverter, the battery and the panels (see engine.ts).
 const ROWS: Row[] = [
   ["led-bulb", "LED bulb", "lighting", 10, 1, 1],
   ["phone-charger", "Phone charger", "work", 10, 1, 1],
@@ -21,20 +25,20 @@ const ROWS: Row[] = [
   ["tv-43", "TV, 43-inch LED", "entertainment", 80, 1, 1],
   ["sound-system", "Sound system", "entertainment", 100, 1, 1],
   ["tv-55", "TV, 55-inch LED", "entertainment", 110, 1, 1],
-  ["refrigerator", "Refrigerator", "kitchen", 150, 0.4, 3],
+  ["refrigerator", "Refrigerator", "kitchen", 150, 0.5, 4],
   ["desktop-computer", "Desktop computer and monitor", "work", 200, 1, 1],
-  ["chest-freezer", "Chest freezer", "kitchen", 200, 0.4, 3],
-  ["large-freezer", "Large or upright freezer", "kitchen", 300, 0.4, 3],
+  ["chest-freezer", "Chest freezer", "kitchen", 200, 0.5, 4],
+  ["large-freezer", "Large or upright freezer", "kitchen", 300, 0.5, 4],
   ["blender", "Blender", "kitchen", 400, 1, 2],
   ["water-pump-half-hp", "Water pump, 0.5 HP", "water", 450, 1, 4],
-  ["washing-machine", "Washing machine", "kitchen", 500, 0.5, 2],
-  ["ac-1hp-inverter", "Air conditioner, 1 HP, inverter", "cooling", 800, 0.5, 1],
-  ["ac-1hp", "Air conditioner, 1 HP, non-inverter", "cooling", 900, 0.7, 3],
+  ["washing-machine", "Washing machine", "kitchen", 500, 0.5, 3],
+  ["ac-1hp-inverter", "Air conditioner, 1 HP, inverter", "cooling", 800, 0.6, 1.5],
+  ["ac-1hp", "Air conditioner, 1 HP, non-inverter", "cooling", 900, 0.8, 3],
   ["microwave", "Microwave", "kitchen", 1000, 1, 1, true],
-  ["pressing-iron", "Pressing iron", "work", 1000, 0.5, 1, true],
+  ["pressing-iron", "Pressing iron", "work", 1000, 0.6, 1, true],
   ["water-pump-1hp", "Water pump, 1 HP", "water", 1000, 1, 4, true],
-  ["ac-1-5hp-inverter", "Air conditioner, 1.5 HP, inverter", "cooling", 1200, 0.5, 1],
-  ["ac-1-5hp", "Air conditioner, 1.5 HP, non-inverter", "cooling", 1300, 0.7, 3],
+  ["ac-1-5hp-inverter", "Air conditioner, 1.5 HP, inverter", "cooling", 1200, 0.6, 1.5],
+  ["ac-1-5hp", "Air conditioner, 1.5 HP, non-inverter", "cooling", 1300, 0.8, 3],
   ["electric-kettle", "Electric kettle", "kitchen", 1500, 1, 1, true],
   ["electric-cooker", "Electric cooker or hot plate", "kitchen", 1500, 0.6, 1, true],
   ["water-pump-1-5hp", "Water pump, 1.5 HP", "water", 1500, 1, 4, true],
@@ -60,6 +64,7 @@ export function itemFromAppliance(
   quantity: number,
   hoursPerDay: number,
   onBackup = !a.highDraw,
+  usageTime: UsageTime = "night",
 ): QuoteItem {
   return {
     name: a.name,
@@ -70,6 +75,7 @@ export function itemFromAppliance(
     surge: a.surge,
     highDraw: a.highDraw,
     onBackup,
+    usageTime,
   };
 }
 

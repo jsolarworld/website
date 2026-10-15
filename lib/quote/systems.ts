@@ -1,11 +1,14 @@
-import { hoursCovered } from "./engine";
+import { backupDcWh, batteryLasts, batteryNameplateWh, defaultProfile, pvNeededW, type InverterProfile } from "./engine";
 import type { Chemistry, Needs, QuoteSettings } from "./types";
 
 /**
  * Systems put together from single catalogue products, one brand at a time (owner decisions, 2026-10-03):
- * an inverter is only ever paired with its own brand's batteries, panels are counted with the cheapest
- * panel per watt (enough for the home and to refill the system's own battery), and cables, breakers and
- * mounting are priced after a site visit, never guessed.
+ * an inverter is only ever paired with its own brand's batteries, and installation is priced after a site
+ * visit, never guessed. Since 2026-10-14 each system is sized for its own inverter (stage 2 of the sizing
+ * spec): its efficiency and no-load draw set the battery and the panels, the panels follow daily use (not
+ * the size of the battery) and are wired up within the inverter's limits, and the spec's current checks
+ * apply. A check runs only when the datasheet figures it needs are entered; until then an engineer
+ * confirms it, as every card already says.
  * Unlike an approved package, nobody has checked these parts together, so every one is shown as
  * "an engineer confirms before installation".
  * A product with no price yet still takes part (decided 2026-10-11): it is listed as "price on request"
@@ -21,7 +24,32 @@ interface Part {
   /** Units in the shop; null when it is supplied on request. */
   stock: number | null;
 }
-export interface InverterPart extends Part {
+
+/** An inverter's solar input limits from its datasheet. Each is null until entered; a check missing a figure is skipped. */
+export interface PvLimits {
+  maxW: number | null;
+  /** The highest open-circuit voltage the solar input takes. Going over it destroys the inverter. */
+  maxVoc: number | null;
+  mpptMinV: number | null;
+  mpptMaxV: number | null;
+  /** How many MPPT inputs it has. */
+  mpptCount: number | null;
+  /** Short-circuit current one MPPT input takes. */
+  maxIscA: number | null;
+}
+
+/** Datasheet figures beyond an inverter's ratings. Missing or null until staff enter them. */
+interface InverterDatasheet {
+  /** 0 to 1. */
+  efficiency?: number | null;
+  /** No-load draw, watts. */
+  idleW?: number | null;
+  pv?: PvLimits;
+  /** The most current it charges the battery with. */
+  maxChargeA?: number | null;
+}
+
+export interface InverterPart extends Part, InverterDatasheet {
   brand: string;
   continuousW: number;
   surgeW: number;
@@ -33,16 +61,25 @@ export interface BatteryPart extends Part {
   /** Nominal capacity of one unit. */
   wh: number;
   voltage: number;
+  maxChargeA?: number | null;
+  maxDischargeA?: number | null;
+  /** The most that can be joined in parallel, from the datasheet. */
+  maxParallel?: number | null;
 }
 /** An inverter sold with its (lithium) battery: one all-in-one unit or a matched set. */
-export interface SetPart extends Part {
+export interface SetPart extends Part, InverterDatasheet {
   brand: string;
   continuousW: number;
   surgeW: number;
   batteryWh: number;
+  /** The battery's nominal voltage, for the charge check; 0 or missing when not entered. */
+  systemVoltage?: number;
 }
 export interface PanelPart extends Part {
   watts: number;
+  voc?: number | null;
+  vmp?: number | null;
+  isc?: number | null;
 }
 export interface Parts {
   inverters: InverterPart[];
@@ -69,17 +106,32 @@ export interface SystemOption {
   lines: SystemLine[];
   /**
    * Equipment only: inverter, batteries and panels, counting the lines that have a price (see `fullyPriced`).
-   * Installation materials are priced after a site visit.
+   * Accessories and installation are not included.
    */
   totalNgn: number;
   inverterContinuousW: number;
   batteryWh: number;
-  /** Null when nothing was set to run on battery. */
+  /** Hours the battery carries the backup load: exactly the hours asked for when at its target. Null when nothing runs then. */
   backupHours: number | null;
+  // The five below are missing on quotes saved before 2026-10-15.
+  /** With more than a whole day's use stored: days of normal use. */
+  backupDays?: number | null;
+  /** The battery falls short of the target: a set's fixed battery, or the most of a model that can be joined. */
+  short?: boolean;
+  /** The inverter is more than 2.5 times what the home needs: shown with room to add more later. */
+  oversized?: boolean;
+  /** The charge current the datasheets allow cannot put the night's energy back in one day of sun. */
+  slowRefill?: boolean;
+  /** How the panels wire up, when the datasheets let it be checked. Null when an engineer works it out. */
+  layout?: { strings: number; perString: number } | null;
 }
 
-/** Battery strings wired side by side. More than this is a design job for an engineer. */
+/** Battery strings wired side by side when the battery's datasheet gives no limit. More is a design job for an engineer. */
 const MAX_PARALLEL = 4;
+/** A brand's systems stay within twice its smallest inverter that fits, so a 30 kVA set is not offered beside a 6 kVA one. */
+const SIZE_CAP = 2;
+/** More than this times the home's need is marked as bigger than needed. */
+const OVERSIZED = 2.5;
 
 /** 12.8 V and 12 V are the same class. Null for anything else: high-voltage stacks go to an engineer. */
 export function voltageClass(v: number): 12 | 24 | 48 | null {
@@ -96,129 +148,266 @@ export const fullyPriced = (o: { lines: { unitPriceNgn: number | null }[] }) => 
 
 const inStock = (p: Part, quantity: number) => p.stock == null || p.stock >= quantity;
 const hasPrice = <T extends { price: number | null }>(p: T): p is T & { price: number } => p.price != null;
-const byPriceThenId = <T extends { price: number; id: string }>(a: T, b: T) => a.price - b.price || a.id.localeCompare(b.id);
 
-/**
- * The cheapest, among the choices that are priced in full, so the customer sees a total whenever the
- * brand can give one. Only when none is priced in full, the closest fit among the rest: the smallest
- * battery, then the smallest inverter.
- */
-function choose<T extends { price: number | null; wh: number; continuousW: number; id: string }>(list: T[]): T | undefined {
-  const priced = list.filter(hasPrice).sort(byPriceThenId)[0];
-  return priced ?? [...list].sort((a, b) => a.wh - b.wh || a.continuousW - b.continuousW || a.id.localeCompare(b.id))[0];
-}
+/** An inverter's own losses, taking the settings' defaults for what its datasheet leaves out. */
+const profileOf = (p: InverterDatasheet, s: QuoteSettings): InverterProfile => ({
+  efficiency: p.efficiency ?? defaultProfile(s).efficiency,
+  idleW: p.idleW ?? defaultProfile(s).idleW,
+});
 
-/**
- * The panel used for counting: cheapest per watt that the shop can supply enough of. When no panel
- * has a price, the biggest one, so there are fewest to mount.
- */
-export function pickPanel(panels: PanelPart[], arrayW: number): PanelPart | null {
-  const usable = panels.filter((p) => p.watts > 0 && inStock(p, Math.ceil(arrayW / p.watts)));
+/** Panels in order of preference: cheapest per watt among the priced ones, then the biggest of the rest, so there are fewest to mount. */
+function panelOrder(panels: PanelPart[]): PanelPart[] {
+  const usable = panels.filter((p) => p.watts > 0);
   const priced = usable.filter(hasPrice).sort((a, b) => a.price / a.watts - b.price / b.watts || a.id.localeCompare(b.id));
-  return priced[0] ?? usable.sort((a, b) => b.watts - a.watts || a.id.localeCompare(b.id))[0] ?? null;
+  const open = usable.filter((p) => p.price == null).sort((a, b) => b.watts - a.watts || a.id.localeCompare(b.id));
+  return [...priced, ...open];
 }
 
-/** How many of one battery model this inverter needs, or null when the two cannot be used together. */
-function bank(b: BatteryPart, inv: InverterPart, needs: Needs): { quantity: number; wh: number } | null {
-  const system = voltageClass(inv.systemVoltage);
+/** The panel the home's own need is counted with: the first in order of preference that the shop can supply enough of. */
+export function pickPanel(panels: PanelPart[], arrayW: number): PanelPart | null {
+  return panelOrder(panels).find((p) => inStock(p, Math.ceil(arrayW / p.watts))) ?? null;
+}
+
+export interface PanelLayout {
+  total: number;
+  /** Null when the datasheets give nothing to check the wiring with. */
+  strings: number | null;
+  perString: number | null;
+  /** Every wiring check had its figures. */
+  checked: boolean;
+}
+
+const NO_LIMITS: PvLimits = { maxW: null, maxVoc: null, mpptMinV: null, mpptMaxV: null, mpptCount: null, maxIscA: null };
+
+/**
+ * The smallest number of panels, at least `minPanels`, that wires up on this inverter (sizing spec 3.3):
+ * equal strings in series, the cold-morning voltage under the inverter's limit (going over it destroys the
+ * inverter), the hot working voltage inside the MPPT range, no more strings on an input than its current
+ * allows, and the total within the solar input power. A check whose figures are missing is skipped
+ * (decided 2026-10-14) and `checked` says whether every one ran. Null when no layout passes.
+ */
+export function layoutPanels(minPanels: number, p: PanelPart, pv: PvLimits | undefined, s: QuoteSettings): PanelLayout | null {
+  const lim = pv ?? NO_LIMITS;
+  const { voc = null, vmp = null, isc = null } = p;
+  const has = {
+    voc: voc != null && lim.maxVoc != null,
+    mpptMin: vmp != null && lim.mpptMinV != null,
+    mpptMax: vmp != null && lim.mpptMaxV != null,
+    current: isc != null && lim.maxIscA != null,
+    power: lim.maxW != null,
+  };
+  const checked = Object.values(has).every(Boolean);
+  const maxPanels = has.power ? Math.floor(lim.maxW! / p.watts) : Infinity;
+  if (minPanels > maxPanels) return null;
+  if (!has.voc && !has.mpptMin && !has.mpptMax && !has.current) return { total: minPanels, strings: null, perString: null, checked: false };
+
+  const inputs = lim.mpptCount ?? 1;
+  const stringsPerInput = has.current ? Math.floor(lim.maxIscA! / isc!) : Infinity;
+  // One panel already gives more current than an input takes.
+  if (stringsPerInput < 1) return null;
+  const upTo = Math.min(maxPanels, minPanels * 2 + 8);
+  for (let total = minPanels; total <= upTo; total++) {
+    for (let strings = 1; strings <= total; strings++) {
+      if (Math.ceil(strings / inputs) > stringsPerInput) break;
+      if (total % strings !== 0) continue;
+      const n = total / strings;
+      if (has.voc && n * voc! * s.vocColdFactor > lim.maxVoc!) continue;
+      if (has.mpptMin && n * vmp! * s.vmpHotFactor < lim.mpptMinV!) continue;
+      if (has.mpptMax && n * vmp! > lim.mpptMaxV!) continue;
+      return { total, strings, perString: n, checked };
+    }
+  }
+  return null;
+}
+
+interface Bank {
+  quantity: number;
+  strings: number;
+  wh: number;
+  short: boolean;
+}
+
+/**
+ * How many of one battery model reach `targetWh` on an inverter of `systemVoltage`, or null when the two
+ * cannot be used together. Lithium packs must match the inverter's voltage; 12 V lead-acid blocks are wired
+ * in series to reach it. With the battery's own parallel limit entered, the bank stops there and is marked
+ * short (sizing spec); without it, more than four strings is left to an engineer.
+ */
+function bank(b: BatteryPart, systemVoltage: number, targetWh: number): Bank | null {
+  const system = voltageClass(systemVoltage);
   const unit = voltageClass(b.voltage);
   if (system == null || unit == null) return null;
-  // Lithium packs must match the inverter's voltage; 12 V lead-acid blocks are wired in series to reach it.
   const series = b.chemistry === "lithium" ? (unit === system ? 1 : 0) : system / unit;
   if (series < 1 || !Number.isInteger(series)) return null;
-  // At least one string even when nothing runs on backup: the inverter still needs a battery.
-  const strings = Math.max(1, Math.ceil(needs.batteryWh[b.chemistry] / (b.wh * series)));
-  if (strings > MAX_PARALLEL) return null;
+  // At least one string even when nothing runs at night: the inverter still needs a battery.
+  const wanted = Math.max(1, Math.ceil(targetWh / (b.wh * series)));
+  if (b.maxParallel == null && wanted > MAX_PARALLEL) return null;
+  const strings = Math.min(wanted, b.maxParallel ?? MAX_PARALLEL);
   const quantity = strings * series;
-  return inStock(b, quantity) ? { quantity, wh: quantity * b.wh } : null;
+  return inStock(b, quantity) ? { quantity, strings, wh: quantity * b.wh, short: wanted > strings } : null;
 }
 
-const fits = (p: { continuousW: number; surgeW: number }, needs: Needs) => p.continuousW >= needs.inverterContinuousW && p.surgeW >= needs.inverterSurgeW;
+/** The smaller of the charge currents that are known; null when neither is. */
+const lowestKnown = (...amps: (number | null | undefined)[]) => {
+  const known = amps.filter((a): a is number => a != null);
+  return known.length ? Math.min(...known) : null;
+};
+
+interface Sizing {
+  /** What the system's battery and inverter set, before the panels are added. */
+  base: Omit<SystemOption, "totalNgn" | "backupHours" | "backupDays" | "short" | "oversized" | "slowRefill" | "layout">;
+  inverter: InverterDatasheet;
+  short: boolean;
+  /** Charge current the datasheets allow, and the battery's nominal voltage: both needed for the refill check. */
+  chargeA: number | null;
+  volts: 12 | 24 | 48 | null;
+}
 
 /**
- * Up to two systems per brand that cover the whole need: its cheapest fitting set, and its cheapest
- * inverter-plus-batteries pairing (see `choose` for parts with no price). Fully priced systems come
- * first, cheapest first. Empty when the load is above the site-visit limit.
+ * Add the panels and finish the figures for one system. Null when no panel wires up on the inverter: that
+ * pairing cannot be offered (sizing spec 3.3). Panels the shop has too few of are left out of the system.
+ */
+function finish(z: Sizing, needs: Needs, panels: PanelPart[], s: QuoteSettings): SystemOption | null {
+  const profile = profileOf(z.inverter, s);
+  const pvW = pvNeededW(needs, profile, z.base.chemistry, s);
+
+  let panelLine: SystemLine | null = null;
+  let layout: SystemOption["layout"] = null;
+  let wiresUp = panels.length === 0;
+  for (const panel of panelOrder(panels)) {
+    const fit = layoutPanels(Math.max(1, Math.ceil(pvW / panel.watts)), panel, z.inverter.pv, s);
+    if (!fit) continue;
+    wiresUp = true;
+    if (!inStock(panel, fit.total)) continue;
+    panelLine = { role: "panel", name: panel.name, slug: panel.slug, quantity: fit.total, unitPriceNgn: panel.price };
+    layout = fit.strings != null && fit.perString != null ? { strings: fit.strings, perString: fit.perString } : null;
+    break;
+  }
+  if (!wiresUp) return null;
+
+  const lines = [...z.base.lines, ...(panelLine ? [panelLine] : [])];
+  const lasts = batteryLasts(z.base.batteryWh, z.base.chemistry, needs, profile, s);
+  const refill = z.chargeA != null && z.volts != null ? z.chargeA * z.volts * needs.peakSunHours : null;
+  return {
+    ...z.base,
+    lines,
+    totalNgn: lines.reduce((sum, l) => sum + (l.unitPriceNgn ?? 0) * l.quantity, 0),
+    backupHours: lasts?.hours ?? null,
+    backupDays: lasts?.days ?? null,
+    short: z.short,
+    oversized: z.base.inverterContinuousW > OVERSIZED * needs.inverterContinuousW,
+    slowRefill: refill != null && refill < backupDcWh(needs, profile) / s.roundTrip[z.base.chemistry],
+    layout,
+  };
+}
+
+/**
+ * The one system to show from a brand's candidates of one kind: one whose battery reaches its target before
+ * one that falls short, then the cheapest priced in full, so the customer sees a total whenever the brand can
+ * give one; with nothing priced in full, the closest fit (the smallest battery, then the smallest inverter).
+ */
+function best(candidates: { option: SystemOption; key: string }[]): SystemOption | undefined {
+  const order = (a: { option: SystemOption; key: string }, b: { option: SystemOption; key: string }) => {
+    const [x, y] = [a.option, b.option];
+    return (
+      Number(x.short ?? false) - Number(y.short ?? false) ||
+      Number(!fullyPriced(x)) - Number(!fullyPriced(y)) ||
+      (fullyPriced(x) ? x.totalNgn - y.totalNgn : x.batteryWh - y.batteryWh || x.inverterContinuousW - y.inverterContinuousW) ||
+      a.key.localeCompare(b.key)
+    );
+  };
+  return [...candidates].sort(order)[0]?.option;
+}
+
+/**
+ * Up to two systems per brand: its best set and its best inverter with batteries, both within twice the
+ * brand's smallest inverter that fits (sizing spec 4). Fully priced systems that reach the battery target
+ * come first, cheapest first, then those that fall short, then those waiting for a price. Empty when the
+ * load is above the site-visit limit.
  */
 export function buildSystems(needs: Needs, parts: Parts, s: QuoteSettings, chemistry?: Chemistry): SystemOption[] {
   if (tooLarge(needs, s)) return [];
 
-  const finish = (o: Omit<SystemOption, "totalNgn" | "backupHours">): SystemOption => {
-    // A battery bigger than the home's need gets more panels than the home's need, so it still refills in about a day.
-    const arrayW = Math.max(needs.arrayW, o.batteryWh * s.panelWPerBatteryWh);
-    const panel = pickPanel(parts.panels, arrayW);
-    const panelLines: SystemLine[] = panel
-      ? [{ role: "panel", name: panel.name, slug: panel.slug, quantity: Math.ceil(arrayW / panel.watts), unitPriceNgn: panel.price }]
-      : [];
-
-    const lines = [...o.lines, ...panelLines];
-    return {
-      ...o,
-      lines,
-      totalNgn: lines.reduce((sum, l) => sum + (l.unitPriceNgn ?? 0) * l.quantity, 0),
-      backupHours: hoursCovered(o.batteryWh, o.chemistry, needs.backupDraws, s),
-    };
-  };
-
+  const fitsNeed = (p: Part & { continuousW: number; surgeW: number }) =>
+    inStock(p, 1) && p.continuousW >= needs.inverterContinuousW && p.surgeW >= needs.inverterSurgeW;
   const brands = new Set([...parts.inverters, ...parts.sets].map((p) => p.brand));
   const options: SystemOption[] = [];
 
   for (const brand of brands) {
+    const inverters = parts.inverters.filter((p) => p.brand === brand && fitsNeed(p));
     // Sets hold lithium batteries, so they are left out when the customer asked for tubular.
-    const set =
-      chemistry === "tubular"
-        ? undefined
-        : choose(
-            parts.sets
-              .filter((p) => p.brand === brand && inStock(p, 1) && fits(p, needs) && p.batteryWh >= needs.batteryWh.lithium)
-              .map((p) => ({ ...p, wh: p.batteryWh })),
-          );
-    if (set) {
-      options.push(
-        finish({
-          id: `${brand}:set`,
-          brand,
-          kind: "set",
-          chemistry: "lithium",
-          lines: [{ role: "set", name: set.name, slug: set.slug, quantity: 1, unitPriceNgn: set.price }],
-          inverterContinuousW: set.continuousW,
-          batteryWh: set.batteryWh,
-        }),
-      );
-    }
+    const sets = chemistry === "tubular" ? [] : parts.sets.filter((p) => p.brand === brand && fitsNeed(p));
+    const smallest = Math.min(...[...inverters, ...sets].map((p) => p.continuousW));
+    if (!Number.isFinite(smallest)) continue;
+    const withinCap = (p: { continuousW: number }) => p.continuousW <= SIZE_CAP * smallest;
 
-    // Every fitting inverter with every battery model of the brand: keep the cheapest pairing.
-    const pairings: { inv: InverterPart; battery: BatteryPart; quantity: number; wh: number; price: number | null; continuousW: number; id: string }[] = [];
-    for (const inv of parts.inverters) {
-      if (inv.brand !== brand || !inStock(inv, 1) || !fits(inv, needs)) continue;
-      for (const battery of parts.batteries) {
-        if (battery.brand !== brand || (chemistry && battery.chemistry !== chemistry)) continue;
-        const b = bank(battery, inv, needs);
-        if (!b) continue;
-        const price = hasPrice(inv) && hasPrice(battery) ? inv.price + battery.price * b.quantity : null;
-        pairings.push({ inv, battery, ...b, price, continuousW: inv.continuousW, id: `${inv.id}:${battery.id}` });
-      }
-    }
-    const best = choose(pairings);
-    if (best) {
-      options.push(
-        finish({
-          id: `${brand}:separate`,
-          brand,
-          kind: "separate",
-          chemistry: best.battery.chemistry,
-          lines: [
-            { role: "inverter", name: best.inv.name, slug: best.inv.slug, quantity: 1, unitPriceNgn: best.inv.price },
-            { role: "battery", name: best.battery.name, slug: best.battery.slug, quantity: best.quantity, unitPriceNgn: best.battery.price },
-          ],
-          inverterContinuousW: best.inv.continuousW,
-          batteryWh: best.wh,
-        }),
+    // A set's battery is fixed: one below the target is still shown, with the hours it really gives.
+    const setCandidates = sets.filter(withinCap).flatMap((set) => {
+      const target = batteryNameplateWh(needs, profileOf(set, s), "lithium", s);
+      const option = finish(
+        {
+          base: {
+            id: `${brand}:set`,
+            brand,
+            kind: "set",
+            chemistry: "lithium",
+            lines: [{ role: "set", name: set.name, slug: set.slug, quantity: 1, unitPriceNgn: set.price }],
+            inverterContinuousW: set.continuousW,
+            batteryWh: set.batteryWh,
+          },
+          inverter: set,
+          short: set.batteryWh < target,
+          chargeA: set.maxChargeA ?? null,
+          volts: voltageClass(set.systemVoltage ?? 0),
+        },
+        needs,
+        parts.panels,
+        s,
       );
-    }
+      return option ? [{ option, key: set.id }] : [];
+    });
+
+    // Every inverter that fits, with every battery model of the brand.
+    const pairCandidates = inverters.filter(withinCap).flatMap((inv) => {
+      const profile = profileOf(inv, s);
+      const volts = voltageClass(inv.systemVoltage);
+      return parts.batteries.flatMap((battery) => {
+        if (battery.brand !== brand || (chemistry && battery.chemistry !== chemistry) || volts == null) return [];
+        const b = bank(battery, inv.systemVoltage, batteryNameplateWh(needs, profile, battery.chemistry, s));
+        if (!b) return [];
+        // Everything at once, through the inverter, must be within the current the strings can give.
+        if (battery.maxDischargeA != null && needs.peakW / profile.efficiency / volts > b.strings * battery.maxDischargeA) return [];
+        const option = finish(
+          {
+            base: {
+              id: `${brand}:separate`,
+              brand,
+              kind: "separate",
+              chemistry: battery.chemistry,
+              lines: [
+                { role: "inverter", name: inv.name, slug: inv.slug, quantity: 1, unitPriceNgn: inv.price },
+                { role: "battery", name: battery.name, slug: battery.slug, quantity: b.quantity, unitPriceNgn: battery.price },
+              ],
+              inverterContinuousW: inv.continuousW,
+              batteryWh: b.wh,
+            },
+            inverter: inv,
+            short: b.short,
+            chargeA: lowestKnown(inv.maxChargeA, battery.maxChargeA != null ? b.strings * battery.maxChargeA : null),
+            volts,
+          },
+          needs,
+          parts.panels,
+          s,
+        );
+        return option ? [{ option, key: `${inv.id}:${battery.id}` }] : [];
+      });
+    });
+
+    for (const o of [best(setCandidates), best(pairCandidates)]) if (o) options.push(o);
   }
 
-  // A system waiting for a price has no total to compare, so those follow the priced ones, by brand.
-  const rank = (o: SystemOption) => (fullyPriced(o) ? 0 : 1);
-  return options.sort((a, b) => rank(a) - rank(b) || (rank(a) === 0 ? a.totalNgn - b.totalNgn : 0) || a.id.localeCompare(b.id));
+  // Priced in full and meeting the target first, then priced but short, then those waiting for a price.
+  const rank = (o: SystemOption) => (fullyPriced(o) ? 0 : 2) + (o.short ? 1 : 0);
+  return options.sort((a, b) => rank(a) - rank(b) || (fullyPriced(a) ? a.totalNgn - b.totalNgn : 0) || a.id.localeCompare(b.id));
 }

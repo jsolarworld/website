@@ -18,8 +18,38 @@ const row = (over: Partial<PartRow>): PartRow => ({
 describe("toParts", () => {
   it("reads an inverter's ratings and treats on-request stock as unlimited", () => {
     const { inverters } = toParts([row({})]);
-    expect(inverters).toEqual([{ id: "p1", name: "Felicity 6kVA Hybrid Inverter 48V", slug: "felicity-6kva", price: 900_000, stock: null, brand: "Felicity", continuousW: 6000, surgeW: 12000, systemVoltage: 48 }]);
+    expect(inverters).toEqual([
+      {
+        id: "p1",
+        name: "Felicity 6kVA Hybrid Inverter 48V",
+        slug: "felicity-6kva",
+        price: 900_000,
+        stock: null,
+        brand: "Felicity",
+        continuousW: 6000,
+        surgeW: 12000,
+        systemVoltage: 48,
+        // No datasheet figures entered: each check that needs one is skipped.
+        efficiency: null,
+        idleW: null,
+        maxChargeA: null,
+        pv: { maxW: null, maxVoc: null, mpptMinV: null, mpptMaxV: null, mpptCount: null, maxIscA: null },
+      },
+    ]);
     expect(toParts([row({ availableOnRequest: false, stock: 3 })]).inverters[0].stock).toBe(3);
+  });
+
+  it("reads the datasheet figures, taking an efficiency as a percentage or a fraction", () => {
+    const specs = { ratedContinuousW: 6000, surgeW: 12000, systemVoltage: 48, efficiency: 93, idleW: 45, pvMaxW: 6500, pvMaxVoc: 500, mpptMinV: 120, mpptMaxV: 450, mpptCount: 2, pvMaxIscA: 22, maxChargeA: 120 };
+    expect(toParts([row({ specs })]).inverters[0]).toMatchObject({
+      efficiency: 0.93,
+      idleW: 45,
+      maxChargeA: 120,
+      pv: { maxW: 6500, maxVoc: 500, mpptMinV: 120, mpptMaxV: 450, mpptCount: 2, maxIscA: 22 },
+    });
+    expect(toParts([row({ specs: { ...specs, efficiency: 0.9 } })]).inverters[0].efficiency).toBe(0.9);
+    // Not an efficiency at all: ignored, so the default stands in.
+    expect(toParts([row({ specs: { ...specs, efficiency: 30 } })]).inverters[0].efficiency).toBeNull();
   });
 
   it("leaves out a product that is missing a rating or a brand, instead of guessing", () => {

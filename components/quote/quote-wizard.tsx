@@ -23,7 +23,9 @@ import { BrandSystems } from "./brand-systems";
 import { LeftOffNotice } from "./left-off-notice";
 import { saveQuoteAction } from "@/lib/quote/actions";
 import { CONSENT_ERROR, NOTHING_ON_ERROR, PHONE_ERROR } from "@/lib/quote/request";
-import { backupSentence, type QuoteView } from "@/lib/quote/view";
+import { NIGERIAN_STATES } from "@/lib/quote/sun";
+import type { UsageTime } from "@/lib/quote/types";
+import { backupSentence, inverterKw, solarKw, type QuoteView } from "@/lib/quote/view";
 import { quoteSummary } from "@/lib/quote/summary";
 import { normalizeNgPhone } from "@/lib/phone";
 import { SITE, whatsappLink } from "@/lib/site";
@@ -44,7 +46,12 @@ interface Row {
   hours: number;
   /** Heavy loads (heaters, big pumps) start off battery backup; the customer can switch them on. */
   onBackup: boolean;
+  /** When it is used: at night (the default, the safe assumption), in the day, or both. */
+  usage: UsageTime;
 }
+
+// Daytime use runs on the sun, so it needs less battery: the one choice that brings a battery down fairly.
+const USAGE_LABEL: Record<UsageTime, string> = { night: "Mostly at night", day: "Mostly in the daytime", both: "Day and night" };
 
 interface CustomRow {
   name: string;
@@ -102,7 +109,7 @@ export function QuoteWizard({ appliances }: { appliances: ApplianceOption[] }) {
     return [...m.entries()];
   }, [appliances]);
 
-  const rowOf = (a: ApplianceOption): Row => rows[a.slug] ?? { qty: 0, hours: a.defaultHours, onBackup: !a.highDraw };
+  const rowOf = (a: ApplianceOption): Row => rows[a.slug] ?? { qty: 0, hours: a.defaultHours, onBackup: !a.highDraw, usage: "night" };
   const setRow = (a: ApplianceOption, patch: Partial<Row>) =>
     setRows((r) => ({ ...r, [a.slug]: { ...rowOf(a), ...patch } }));
 
@@ -111,7 +118,7 @@ export function QuoteWizard({ appliances }: { appliances: ApplianceOption[] }) {
     const lib = appliances.flatMap((a) => {
       const r = rows[a.slug];
       if (!r || r.qty < 1) return [];
-      return [{ name: a.name, watts: a.watts, quantity: r.qty, hoursPerDay: r.hours, dutyCycle: a.dutyCycle, surge: a.surge, highDraw: a.highDraw, onBackup: r.onBackup }];
+      return [{ name: a.name, watts: a.watts, quantity: r.qty, hoursPerDay: r.hours, dutyCycle: a.dutyCycle, surge: a.surge, highDraw: a.highDraw, onBackup: r.onBackup, usageTime: r.usage }];
     });
     const cus = custom.map((c) => ({ name: c.name, watts: c.watts, quantity: c.qty, hoursPerDay: c.hours, dutyCycle: 1, surge: 1, highDraw: false, onBackup: true }));
     return [...lib, ...cus];
@@ -253,6 +260,23 @@ export function QuoteWizard({ appliances }: { appliances: ApplianceOption[] }) {
                             )}
                           </div>
                         </div>
+                        {r.qty > 0 && r.hours < 24 && (
+                          <label className="mt-3 flex flex-wrap items-center gap-2 text-sm text-muted">
+                            When do you use it?
+                            <Select
+                              value={r.usage}
+                              onChange={(e) => setRow(a, { usage: e.target.value as UsageTime })}
+                              className="h-9 w-auto text-sm"
+                              aria-label={`${a.name}: when do you use it`}
+                            >
+                              {(Object.keys(USAGE_LABEL) as UsageTime[]).map((u) => (
+                                <option key={u} value={u}>
+                                  {USAGE_LABEL[u]}
+                                </option>
+                              ))}
+                            </Select>
+                          </label>
+                        )}
                         {r.qty > 0 && a.highDraw && (
                           <label className="mt-3 flex items-center gap-2 text-sm text-ember-700">
                             <input
@@ -376,8 +400,17 @@ export function QuoteWizard({ appliances }: { appliances: ApplianceOption[] }) {
           </Field>
 
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field name="state" label="State" required={false}>
-              {(f) => <Input {...f} value={state} onChange={(e) => setState(e.target.value)} placeholder="Lagos" />}
+            <Field name="state" label="State" required={false} hint="It sets how much sun your panels get">
+              {(f) => (
+                <Select {...f} value={state} onChange={(e) => setState(e.target.value)}>
+                  <option value="">Choose your state</option>
+                  {NIGERIAN_STATES.map((st) => (
+                    <option key={st.name} value={st.name}>
+                      {st.name}
+                    </option>
+                  ))}
+                </Select>
+              )}
             </Field>
             <Field name="area" label="Area" required={false}>
               {(f) => <Input {...f} value={area} onChange={(e) => setArea(e.target.value)} placeholder="Ojo, Lekki, Ikeja…" />}
@@ -461,7 +494,9 @@ function Results({
   const n = view.needs;
   const systems = view.systems ?? [];
   const panelW = view.panel?.watts ?? PANEL_W;
-  const panels = Math.ceil(n.arrayW / panelW);
+  // The headline's solar figure follows the battery type asked for: tubular loses more on the way in and out.
+  const pvW = chemistry === "tubular" && n.pvW ? n.pvW.tubular : n.arrayW;
+  const panels = Math.ceil(pvW / panelW);
   const battery =
     chemistry === "" ? `${kwh(n.batteryWh.lithium)} kWh lithium or ${kwh(n.batteryWh.tubular)} kWh tubular` : `${kwh(n.batteryWh[chemistry])} kWh ${chemistry}`;
   const summary = quoteSummary(view, saved, `${SITE.url}/solar-quote/${saved}`);
@@ -471,10 +506,10 @@ function Results({
       <Panel className="p-6 sm:p-8">
         <Eyebrow className="text-solar-400">What your home needs</Eyebrow>
         <div className="mt-5 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-          <SpecFigure onChassis label="Inverter" value={Math.ceil(n.inverterContinuousW).toLocaleString("en-NG")} unit="W or more" note={`Must handle ${Math.ceil(n.inverterSurgeW).toLocaleString("en-NG")} W at start-up`} />
+          <SpecFigure onChassis label="Inverter" value={inverterKw(n.inverterContinuousW)} unit="kW or more" note={`Must handle ${(n.inverterSurgeW / 1000).toFixed(1)} kW at start-up`} />
           <SpecFigure onChassis label="Used per day" value={(n.dailyWh / 1000).toFixed(1)} unit="kWh" />
-          <SpecFigure onChassis label={`Battery for ${view.backupHours}h`} value={n.backupLoadW > 0 ? battery : "None"} />
-          <SpecFigure onChassis label="Solar panels" value={`${panels}`} unit={`× ${panelW} W`} note={`about ${Math.round(n.arrayW).toLocaleString("en-NG")} W in total`} />
+          <SpecFigure onChassis label={`Battery for ${view.backupHours}h`} value={n.backupWh > 0 ? battery : "None"} note={n.backupWh > 0 ? undefined : "Nothing on your list runs at night"} />
+          <SpecFigure onChassis label="Solar" value={solarKw(pvW)} unit="kW" note={`${panels} × ${panelW} W panels, for ${n.peakSunHours} sun hours a day`} />
         </div>
       </Panel>
 
@@ -517,7 +552,7 @@ function Results({
                 <h3 className="text-subtitle">{o.name}</h3>
                 <Price amount={o.priceNgn} size="lg" />
                 <p className="text-sm text-muted">
-                  {o.backupHours != null ? backupSentence(o.backupHours) : "Backup depends on your list"}
+                  {o.backupHours != null ? backupSentence(o.backupHours, o.backupDays) : "Backup depends on your list"}
                   {o.label === "Budget" && o.backupHours != null && o.backupHours < view.backupHours && ` (less than the ${view.backupHours}h you asked for)`}
                 </p>
                 <ul className="space-y-1 text-sm">
@@ -545,7 +580,7 @@ function Results({
         </div>
       )}
 
-      <BrandSystems systems={systems} reference={saved} />
+      <BrandSystems systems={systems} reference={saved} backupHours={view.backupHours} />
 
       {(systems.length > 0 || view.options.length > 0) && <AccessoriesList lines={view.accessories} />}
 

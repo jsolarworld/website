@@ -30,6 +30,32 @@ const QUOTE_OPTIONAL = new Set(["surgeW"]);
  */
 const QUOTE_STAND_IN: Record<string, string> = { ratedContinuousW: "ratedKva" };
 
+/**
+ * Datasheet figures for the quote's checks (sizing spec, 2026-10-14): the panel wiring, the battery's
+ * currents, and the inverter's own losses. Never needed (`lacksQuoteDetails` ignores them; a check runs
+ * only once its figures are entered), but staff are asked for them, one group to a gap so the line stays short.
+ */
+const INVERTER_DATASHEET = [
+  { label: "efficiency and no-load consumption", keys: ["efficiency", "idleW"] },
+  { label: "solar input limits", keys: ["pvMaxW", "pvMaxVoc", "mpptMinV", "mpptMaxV", "mpptCount", "pvMaxIscA"] },
+  { label: "max battery charge current", keys: ["maxChargeA"] },
+];
+const LEAD_ACID_DATASHEET = [{ label: "max charge current", keys: ["maxChargeA"] }];
+export const QUOTE_DATASHEET: Record<string, { label: string; keys: string[] }[]> = {
+  inverters: INVERTER_DATASHEET,
+  "inverter-and-battery-sets": INVERTER_DATASHEET,
+  "lithium-batteries": [
+    { label: "charge and discharge current", keys: ["maxChargeA", "maxDischargeA"] },
+    { label: "how many can be joined in parallel", keys: ["maxParallel"] },
+  ],
+  "tubular-batteries": LEAD_ACID_DATASHEET,
+  "drycell-batteries": LEAD_ACID_DATASHEET,
+  "solar-panels": [{ label: "Voc, Vmp and Isc", keys: ["voltageVoc", "voltageVmp", "currentIsc"] }],
+};
+
+/** Datasheet keys for a category, for the product form's hints. */
+export const datasheetKeys = (categorySlug: string): string[] => (QUOTE_DATASHEET[categorySlug] ?? []).flatMap((g) => g.keys);
+
 /** The quote tool groups inverters and batteries by brand. Panels can go with any brand. */
 const BRAND_NEEDED = new Set(["inverters", "inverter-and-battery-sets", "lithium-batteries", "tubular-batteries", "drycell-batteries"]);
 
@@ -89,9 +115,16 @@ function quoteGaps(p: QuoteCheck, blockingOnly = false): string[] {
   return gaps;
 }
 
-/** Everything worth filling in, in the order staff should see it: price, photo, then what the quote tool needs. */
+/** Datasheet groups with any figure still empty, for single products the quote tool reads. */
+function datasheetGaps(p: QuoteCheck): string[] {
+  if (!usedByQuoteTool(p)) return [];
+  const specs = (typeof p.specs === "object" && p.specs !== null ? p.specs : {}) as Record<string, unknown>;
+  return (QUOTE_DATASHEET[p.categorySlug] ?? []).filter((g) => g.keys.some((k) => !filled(specs[k]))).map((g) => g.label);
+}
+
+/** Everything worth filling in, in the order staff should see it: price, photo, what the quote tool needs, then the datasheet figures. */
 export function missingDetails(p: MissingInput): string[] {
-  return [...(p.priceNgn == null ? ["price"] : []), ...(p.mediaCount === 0 ? ["photo"] : []), ...quoteGaps(p)];
+  return [...(p.priceNgn == null ? ["price"] : []), ...(p.mediaCount === 0 ? ["photo"] : []), ...quoteGaps(p), ...datasheetGaps(p)];
 }
 
 /**

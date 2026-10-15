@@ -1,5 +1,5 @@
 import { normalizeNgPhone } from "../phone";
-import type { Chemistry, QuoteInput, QuoteItem } from "./types";
+import type { Chemistry, QuoteInput, QuoteItem, UsageTime } from "./types";
 
 /**
  * Server actions are reachable by direct POST, so everything the wizard sends is
@@ -9,6 +9,7 @@ import type { Chemistry, QuoteInput, QuoteItem } from "./types";
 const MAX_ITEMS = 40;
 const MAX_WATTS = 20_000;
 const MAX_QTY = 100;
+const USAGE_TIMES: UsageTime[] = ["night", "day", "both"];
 
 export interface QuoteRequest {
   input: QuoteInput;
@@ -68,13 +69,16 @@ export function parseQuoteRequest(raw: unknown): Result<QuoteRequest> {
       surge,
       highDraw: it.highDraw === true,
       onBackup: it.onBackup !== false,
+      // Anything else counts as night, the safe assumption: all its hours fall in the backup window.
+      usageTime: USAGE_TIMES.includes(it.usageTime as UsageTime) ? (it.usageTime as UsageTime) : "night",
     });
   }
 
   // Appliances left off the system are not sized for, so a list of only those leaves nothing to quote.
   if (!items.some((i) => i.onBackup)) return { ok: false, error: NOTHING_ON_ERROR };
 
-  const backupHours = num(raw.backupHours, 1, 48);
+  // At most a day: the sizing assumes the backup window is part of one day (see `hoursInBackup`).
+  const backupHours = num(raw.backupHours, 1, 24);
   if (backupHours == null) return { ok: false, error: "Choose how many hours of backup you need" };
 
   const chemistry = raw.chemistry === "lithium" || raw.chemistry === "tubular" ? raw.chemistry : undefined;

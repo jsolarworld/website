@@ -35,6 +35,10 @@ export function toParts(rows: PartRow[], powerFactor = DEFAULT_SETTINGS.inverter
       const v = typeof specs[key] === "string" ? Number(specs[key]) : specs[key];
       return typeof v === "number" && Number.isFinite(v) && v > 0 ? v : 0;
     };
+    // Datasheet figures for the quote's checks (sizing spec, 2026-10-14): null until entered, and a check then is skipped.
+    const opt = (key: string) => n(key) || null;
+    // Counts (inputs, batteries) are whole numbers.
+    const count = (key: string) => (Math.floor(n(key)) >= 1 ? Math.floor(n(key)) : null);
     const base = { id: r.id, name: r.name, slug: r.slug, price: r.price, stock: r.availableOnRequest ? null : r.stock };
     const brand = r.brandName ?? "";
     // With only a kVA figure, the inverter is counted at the usual power factor until its real watts are entered.
@@ -42,24 +46,41 @@ export function toParts(rows: PartRow[], powerFactor = DEFAULT_SETTINGS.inverter
     // With no surge rating entered, count on the continuous rating: an inverter can always start what it can run.
     const surgeW = n("surgeW") || continuousW;
     if (ENGINEER_ONLY.test(`${r.name} ${typeof specs.type === "string" ? specs.type : ""}`)) continue;
+    // Entered as a percentage (93), or by some as a fraction (0.93); anything else is ignored.
+    const eff = n("efficiency") > 1 ? n("efficiency") / 100 : n("efficiency");
+    const datasheet = {
+      efficiency: eff >= 0.5 && eff <= 1 ? eff : null,
+      idleW: opt("idleW"),
+      maxChargeA: opt("maxChargeA"),
+      pv: { maxW: opt("pvMaxW"), maxVoc: opt("pvMaxVoc"), mpptMinV: opt("mpptMinV"), mpptMaxV: opt("mpptMaxV"), mpptCount: count("mpptCount"), maxIscA: opt("pvMaxIscA") },
+    };
 
     switch (r.categorySlug) {
       case "inverters":
-        parts.inverters.push({ ...base, brand, continuousW, surgeW, systemVoltage: n("systemVoltage") });
+        parts.inverters.push({ ...base, ...datasheet, brand, continuousW, surgeW, systemVoltage: n("systemVoltage") });
         break;
       case "inverter-and-battery-sets":
-        parts.sets.push({ ...base, brand, continuousW, surgeW, batteryWh: n("batteryKwh") * 1000 });
+        parts.sets.push({ ...base, ...datasheet, brand, continuousW, surgeW, batteryWh: n("batteryKwh") * 1000, systemVoltage: n("systemVoltage") });
         break;
       case "lithium-batteries":
-        parts.batteries.push({ ...base, brand, chemistry: "lithium", wh: n("capacityKwh") * 1000 || n("capacityAh") * n("voltage"), voltage: n("voltage") });
+        parts.batteries.push({
+          ...base,
+          brand,
+          chemistry: "lithium",
+          wh: n("capacityKwh") * 1000 || n("capacityAh") * n("voltage"),
+          voltage: n("voltage"),
+          maxChargeA: opt("maxChargeA"),
+          maxDischargeA: opt("maxDischargeA"),
+          maxParallel: count("maxParallel"),
+        });
         break;
       // Drycell (gel/AGM) batteries are sized like tubular ones: both are lead-acid.
       case "tubular-batteries":
       case "drycell-batteries":
-        parts.batteries.push({ ...base, brand, chemistry: "tubular", wh: n("capacityAh") * n("voltage"), voltage: n("voltage") });
+        parts.batteries.push({ ...base, brand, chemistry: "tubular", wh: n("capacityAh") * n("voltage"), voltage: n("voltage"), maxChargeA: opt("maxChargeA") });
         break;
       case "solar-panels":
-        parts.panels.push({ ...base, watts: n("watts") });
+        parts.panels.push({ ...base, watts: n("watts"), voc: opt("voltageVoc"), vmp: opt("voltageVmp"), isc: opt("currentIsc") });
         break;
     }
   }

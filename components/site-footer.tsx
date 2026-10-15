@@ -55,6 +55,16 @@ export function SiteFooter() {
               </a>
             </li>
           </ul>
+          <Eyebrow className="mt-6 text-solar-400">Follow us</Eyebrow>
+          <ul className="mt-3 flex flex-wrap gap-x-4 gap-y-1.5 text-sm">
+            {SITE.socials.map((s) => (
+              <li key={s.name}>
+                <a href={s.url} target="_blank" rel="noopener noreferrer" className="hover:text-white">
+                  {s.name}
+                </a>
+              </li>
+            ))}
+          </ul>
         </div>
 
         <div className="grid grid-cols-2 gap-6 sm:col-span-2 lg:col-span-1 lg:grid-cols-1">

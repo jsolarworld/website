@@ -9,6 +9,13 @@ export const SITE = {
   email: "Jsolarworld2@gmail.com",
   address: "F-Line 1424, Ojo Alaba International Market, Lagos State",
   hours: "Mon–Sat, 24 hours. Closed Sunday.",
+  // The owner's accounts, sent on WhatsApp on 2026-10-14, with the share-tracking bits taken off his links.
+  socials: [
+    { name: "TikTok", handle: "@j.solar.world", url: "https://www.tiktok.com/@j.solar.world" },
+    { name: "Facebook", handle: null, url: "https://www.facebook.com/profile.php?id=61579256637841" },
+    { name: "X", handle: "@jsolarworld", url: "https://x.com/jsolarworld" },
+    { name: "Instagram", handle: "@jsolar_world2", url: "https://www.instagram.com/jsolar_world2/" },
+  ],
 } as const;
 
 export function whatsappLink(text: string) {
@@ -38,6 +45,8 @@ export const localBusiness = {
   telephone: `+234${SITE.phones[0].slice(1)}`,
   email: SITE.email,
   slogan: SITE.slogan,
+  // Tells search engines these profiles belong to the business on this site.
+  sameAs: SITE.socials.map((s) => s.url),
   address: {
     "@type": "PostalAddress",
     streetAddress: "F-Line 1424, Ojo Alaba International Market",

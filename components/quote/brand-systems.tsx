@@ -15,12 +15,15 @@ function orderMessage(o: SystemView, reference?: string) {
   return `Hello ${SITE.shortName}, I'd like this ${o.brand} system from my quote${reference ? ` (${reference})` : ""}: ${parts}. ${price}`;
 }
 
+const strings = (n: number) => `${n} ${n === 1 ? "string" : "strings"}`;
+
 /**
  * Systems put together from the catalogue, grouped by brand, cheapest brand first. Used by the quote
  * wizard and the saved quote page. Nobody has checked these parts together, so the section says so.
- * A product with no price yet is listed as "Price on request" and left out of the total.
+ * A product with no price yet is listed as "Price on request" and left out of the total. `backupHours`
+ * is what the customer asked for, so a battery that falls short can say so.
  */
-export function BrandSystems({ systems, reference }: { systems: SystemView[]; reference?: string }) {
+export function BrandSystems({ systems, reference, backupHours }: { systems: SystemView[]; reference?: string; backupHours?: number }) {
   if (systems.length === 0) return null;
   const brands = [...new Set(systems.map((o) => o.brand))];
 
@@ -30,7 +33,7 @@ export function BrandSystems({ systems, reference }: { systems: SystemView[]; re
         <h2 className="text-title">Systems by brand</h2>
         <p className="mt-1 max-w-2xl text-sm text-muted">
           The devices you need, put together from what we stock to cover your whole list. Each one stays with a single brand, and an engineer
-          confirms it before installation.
+          confirms it before installation. Prices are for the equipment only: accessories and installation are not included.
         </p>
       </div>
 
@@ -45,8 +48,10 @@ export function BrandSystems({ systems, reference }: { systems: SystemView[]; re
                   <CardBody className="flex flex-1 flex-col gap-4">
                     <div className="flex flex-wrap items-center gap-2">
                       <Badge tone="brand">{KIND_LABEL[o.kind]}</Badge>
-                      {o.id === systems[0].id && fullyPriced(o) && <Badge tone="solar">Lowest price</Badge>}
+                      {o.id === systems[0].id && fullyPriced(o) && !o.short && <Badge tone="solar">Lowest price</Badge>}
                       {o.overBudget && <Badge tone="warning">Above your budget</Badge>}
+                      {o.oversized && <Badge tone="neutral">Bigger than you need, with room to add more later</Badge>}
+                      {o.slowRefill && <Badge tone="warning">May not recharge fully in one day</Badge>}
                     </div>
 
                     <ul className="divide-y divide-line text-sm">
@@ -69,10 +74,6 @@ export function BrandSystems({ systems, reference }: { systems: SystemView[]; re
                           )}
                         </li>
                       ))}
-                      <li className="flex items-baseline justify-between gap-4 py-2 text-muted">
-                        <span>Accessories and installation</span>
-                        <span className="shrink-0">Not in this total</span>
-                      </li>
                     </ul>
 
                     <div className="mt-auto">
@@ -90,8 +91,13 @@ export function BrandSystems({ systems, reference }: { systems: SystemView[]; re
                       )}
                       <p className="mt-1 text-sm text-muted">
                         {(o.batteryWh / 1000).toFixed(1)} kWh {o.chemistry} battery
-                        {o.backupHours != null && `, ${backupPhrase(o.backupHours)}`}
+                        {o.backupHours != null && `, ${backupPhrase(o.backupHours, o.backupDays, backupHours)}`}
                       </p>
+                      {o.layout && (
+                        <p className="mt-1 text-xs text-muted">
+                          Panels wired as {strings(o.layout.strings)} of {o.layout.perString}, checked against the inverter&apos;s limits
+                        </p>
+                      )}
                     </div>
 
                     <a className={buttonClass({ variant: "outline", size: "sm" })} href={whatsappLink(orderMessage(o, reference))} target="_blank" rel="noopener noreferrer">

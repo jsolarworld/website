@@ -620,11 +620,11 @@ export default function DesignSystemPage() {
           <SectionHeader
             eyebrow="Components"
             title="Quote: systems by brand"
-            lead="What the quote tool shows once products carry their ratings: one or two systems per brand, never mixed, cheapest first, with the ones waiting for a price last. The sample ratings and prices here are made up."
+            lead="What the quote tool shows once products carry their ratings: one or two systems per brand, never mixed, each sized for its own inverter, cheapest first, with the ones that fall short of the backup asked for and the ones waiting for a price last. The sample ratings and prices here are made up."
           />
 
           <div className="mt-12">
-            <BrandSystems systems={sampleSystems} />
+            <BrandSystems systems={sampleSystems} backupHours={12} />
           </div>
 
           <div className="mt-10">

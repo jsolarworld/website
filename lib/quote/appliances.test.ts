@@ -31,8 +31,14 @@ describe("appliance library", () => {
     }
   });
 
-  it("gives inverter air conditioners no start-up surge, unlike the older kind", () => {
-    expect(byId("ac-1hp-inverter").surge).toBe(1);
-    expect(byId("ac-1hp").surge).toBeGreaterThan(1);
+  it("gives inverter air conditioners a gentle start-up and the older kind a hard one (sizing spec)", () => {
+    expect(byId("ac-1hp-inverter")).toMatchObject({ dutyCycle: 0.6, surge: 1.5 });
+    expect(byId("ac-1hp")).toMatchObject({ dutyCycle: 0.8, surge: 3 });
+  });
+
+  it("has the sizing spec's factors for fridges, freezers, the washing machine and the iron", () => {
+    for (const id of ["refrigerator", "chest-freezer", "large-freezer"]) expect(byId(id)).toMatchObject({ dutyCycle: 0.5, surge: 4 });
+    expect(byId("washing-machine")).toMatchObject({ dutyCycle: 0.5, surge: 3 });
+    expect(byId("pressing-iron")).toMatchObject({ dutyCycle: 0.6, surge: 1 });
   });
 });
