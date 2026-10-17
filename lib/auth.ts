@@ -11,13 +11,17 @@ import { SITE } from "./site";
 const productionHost = process.env.VERCEL_PROJECT_PRODUCTION_URL;
 const baseURL = process.env.BETTER_AUTH_URL ?? (productionHost ? `https://${productionHost}` : SITE.url);
 
+// The site's first address. It still serves the same site after the move to www.jsolarworld.com, and staff
+// still sign in there.
+const VERCEL_ORIGIN = "https://j-solar-world.vercel.app";
+
 // Better Auth rejects any request origin it does not trust (CSRF protection). Development trusts any
 // localhost port because Next moves to 3001, 3002... when 3000 is busy. Production trusts the base URL, the
-// production domain, and anything listed in AUTH_TRUSTED_ORIGINS (comma-separated), e.g. the old
-// *.vercel.app address while a new domain is being switched over.
+// production domain, the old vercel.app address, and anything listed in AUTH_TRUSTED_ORIGINS
+// (comma-separated).
 const trustedOrigins =
   process.env.NODE_ENV === "production"
-    ? [baseURL, ...(productionHost ? [`https://${productionHost}`] : []), ...(process.env.AUTH_TRUSTED_ORIGINS?.split(",").map((o) => o.trim()).filter(Boolean) ?? [])]
+    ? [baseURL, VERCEL_ORIGIN, ...(productionHost ? [`https://${productionHost}`] : []), ...(process.env.AUTH_TRUSTED_ORIGINS?.split(",").map((o) => o.trim()).filter(Boolean) ?? [])]
     : ["http://localhost:*"];
 
 /**
