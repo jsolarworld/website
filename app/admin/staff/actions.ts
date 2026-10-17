@@ -45,7 +45,7 @@ export async function manageStaff(_prev: StaffState, formData: FormData): Promis
   const intent = String(formData.get("intent") ?? "");
   const id = String(formData.get("id") ?? "");
 
-  const target = await db.user.findUnique({ where: { id }, select: { id: true, email: true, name: true, role: true } });
+  const target = await db.user.findUnique({ where: { id }, select: { id: true, email: true, name: true, role: true, requireTwoFactor: true } });
   if (!target || !isStaffRole(target.role)) return { error: "That staff member no longer exists." };
 
   const ownerCount = await db.user.count({ where: { role: "OWNER" } });
@@ -95,7 +95,10 @@ export async function manageStaff(_prev: StaffState, formData: FormData): Promis
     await resetStaffSignIn(target.id, password);
     await logAudit({ actorId: actor.id, action: "staff.reset", entity: "User", entityId: target.id });
     revalidatePath("/admin/staff");
-    return { message: `Sign-in reset for ${target.name}. They must set up their authenticator again.`, reveal: { email: target.email, password } };
+    return {
+      message: `Sign-in reset for ${target.name}.${target.requireTwoFactor ? " They must set up their authenticator again." : ""}`,
+      reveal: { email: target.email, password },
+    };
   }
 
   return { error: "Unknown action." };

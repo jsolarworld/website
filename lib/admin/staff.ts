@@ -5,7 +5,7 @@ import type { StaffRole } from "./permissions";
 
 /**
  * Create a staff login without going through public sign-up (which is disabled).
- * The user must then sign in and enrol an authenticator app before reaching the admin.
+ * Two-step sign-in starts off (owner decision, 2026-10-17); an owner can require it on the Staff page.
  */
 export async function createStaffUser(input: { email: string; name: string; role: StaffRole; password: string }) {
   const ctx = await auth.$context;
@@ -27,6 +27,7 @@ export async function createStaffUser(input: { email: string; name: string; role
       name: input.name.trim(),
       emailVerified: true,
       role: input.role,
+      requireTwoFactor: false,
       accounts: {
         create: { id: crypto.randomUUID(), providerId: "credential", accountId: id, password: passwordHash },
       },

@@ -29,7 +29,7 @@ function Reveal({ state }: { state: StaffState }) {
               </p>
               <p className="font-mono text-base">{state.reveal.password}</p>
               <p className="text-xs">
-                They sign in at /admin/login with {state.reveal.email}, then set up their authenticator app and change the password on the Security page.
+                They sign in at /admin/login with {state.reveal.email}, then change the password on the Security page.
               </p>
             </div>
           )}

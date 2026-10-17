@@ -17,7 +17,7 @@ async function main() {
   await createStaffUser({ email, name, role, password });
   console.log(`Created ${role} ${email}`);
   if (!given) console.log(`Temporary password (shown once): ${password}`);
-  console.log("Sign in at /admin/login, then set up your authenticator app when asked.");
+  console.log("Sign in at /admin/login, then change the password on the Security page.");
 }
 
 main()

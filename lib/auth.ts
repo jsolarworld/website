@@ -2,6 +2,7 @@ import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { nextCookies } from "better-auth/next-js";
 import { twoFactor } from "better-auth/plugins";
+import { after } from "next/server";
 import { db } from "./db";
 import { sendEmail } from "./email";
 import { SITE } from "./site";
@@ -38,12 +39,13 @@ export const auth = betterAuth({
     disableSignUp: true,
     minPasswordLength: 10,
     // A reset link works once, for an hour, and signs the person out everywhere. It does not touch their
-    // authenticator, so a stolen mailbox alone is still not enough to get into the admin.
+    // authenticator, so for anyone who uses one, a stolen mailbox alone is still not enough to get into the admin.
     resetPasswordTokenExpiresIn: 60 * 60,
     revokeSessionsOnPasswordReset: true,
     sendResetPassword: async ({ user, url }) => {
-      // Not awaited: the response must not reveal, by its timing, whether the address has an account.
-      void sendEmail({
+      // Better Auth hands this promise to `after` (advanced.backgroundTasks below) instead of waiting for it, so the
+      // reply's timing does not reveal whether the address has an account.
+      await sendEmail({
         to: user.email,
         subject: `Reset your ${SITE.shortName} password`,
         text:
@@ -58,9 +60,14 @@ export const auth = betterAuth({
       // input: false means a client can never set its own role.
       role: { type: "string", required: false, defaultValue: "CUSTOMER", input: false },
       phone: { type: "string", required: false },
-      // Read-only to clients; owners change it on the Staff page. Defaults to on.
-      requireTwoFactor: { type: "boolean", required: false, defaultValue: true, input: false },
+      // Read-only to clients; owners change it on the Staff page. Off by default since 2026-10-17.
+      requireTwoFactor: { type: "boolean", required: false, defaultValue: false, input: false },
     },
+  },
+  advanced: {
+    // Emails go out after the reply. `after` keeps the function running until they are handed to Resend: a promise
+    // left running on its own was frozen with the function once the reply went out, so no reset email was ever sent.
+    backgroundTasks: { handler: after },
   },
   plugins: [twoFactor({ issuer: SITE.shortName }), nextCookies()],
 });
